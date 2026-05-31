@@ -4,6 +4,7 @@ on:
     branches:
       - master
     paths:
+      - .github
       - src/**
       - 'angular.json'
       - 'package.json'
@@ -51,7 +52,7 @@ jobs:
             --delete
       - name: Upload index.html (no-cache)
         run: |
-          aws s3 cp dist/korabot-frontend/browser/index.html s3://$BUCKET/index.html \
+          aws s3 cp dist/korabo-frontend/browser/index.html s3://$BUCKET/index.html \
             --cache-control "no-cache,no-store,must-revalidate"
 
       - name: Invalidate CloudFront
