@@ -4,7 +4,6 @@ on:
     branches:
       - master
     paths:
-      - .github
       - src/**
       - 'angular.json'
       - 'package.json'
