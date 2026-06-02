@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
+import { authGuard } from './login/auth.guard';
 import { Login } from './login/login';
 import { Chat } from './chat/chat';
-import { authGuard } from './login/auth.guard';
 
 export const routes: Routes = [
   { path: 'login', component: Login, title: 'Login' },
