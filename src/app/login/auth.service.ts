@@ -34,7 +34,7 @@ export class AuthService {
 
   login(payload: LoginRequest) {
     return this.http
-      .post<LoginResponse>(`${environment.apiUrl}/auth/login`, payload)
+      .post<LoginResponse>(`${environment.apiUrl}/auth/login`, payload, { withCredentials: true })
       .pipe(tap((res) => this.setToken(res.access_token)));
   }
 
