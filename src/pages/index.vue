@@ -147,7 +147,7 @@ const auth = useAuthStore()
     <!-- Footer -->
     <footer class="border-t">
       <div class="mx-auto max-w-6xl px-6 py-8 text-center text-sm text-muted-foreground">
-        © {{ new Date().getFullYear() }} Korabo. Built with Vue, Vite & shadcn-vue.
+        © {{ new Date().getFullYear() }} Korabo. Built with Vue.
       </div>
     </footer>
   </div>
