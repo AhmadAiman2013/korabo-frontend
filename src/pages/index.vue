@@ -2,7 +2,7 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Users, MessageSquareText, BookOpen, Zap, ArrowRight } from '@lucide/vue'
-import { useAuthStore } from '@/stores/auth.ts';
+import { useAuthStore } from '@/stores/auth.ts'
 
 const features = [
   {
@@ -55,7 +55,11 @@ const auth = useAuthStore()
               Features
             </a>
           </nav>
-          <RouterLink v-if="auth.isAuthenticated" to="/dashboard" class="text-lg font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline">
+          <RouterLink
+            v-if="auth.isAuthenticated"
+            to="/dashboard"
+            class="text-lg font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
+          >
             Dashboard
           </RouterLink>
         </div>
