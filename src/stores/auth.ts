@@ -8,6 +8,46 @@ export interface LoginRequest {
   password: string
 }
 
+export interface TotpSetupRequest {
+  email: string
+}
+
+export interface TotpSetupResponse {
+  code: string
+  otpauth_url: string
+}
+
+export interface TotpVerifyRequest {
+  email: string
+  code: string
+}
+
+export interface TotpVerifyResponse {
+  code: string
+  status: string
+}
+
+export interface RegisterRequest {
+  email: string
+  password: string
+}
+
+export interface RegisterResponse {
+  code: string
+  status: string
+}
+
+export interface ForgotPasswordRequest {
+  email: string
+  code: string
+  new_password: string
+}
+
+export interface ForgotPasswordResponse {
+  code: string
+  status: string
+}
+
 export interface AuthResponse {
   code: string
   status: string
@@ -33,6 +73,36 @@ export const useAuthStore = defineStore('auth', () => {
     setSession(res)
     return res
   }
+
+  async function totp_setup(payload: TotpSetupRequest) {
+    return await http<TotpSetupResponse>('/auth/totp/setup', {
+      method: 'POST',
+      body: payload,
+    })
+  }
+
+  async function totp_verify(payload: TotpVerifyRequest) {
+    return await http<TotpVerifyResponse>('/auth/totp/verify-setup', {
+      method: 'POST',
+      body: payload,
+    })
+  }
+
+  async function register(payload: RegisterRequest) {
+    return await http<RegisterResponse>('/auth/register', {
+      method: 'POST',
+      body: payload,
+    })
+  }
+
+  async function forgotPassword(payload: ForgotPasswordRequest) {
+    return await http<ForgotPasswordResponse>('/auth/forgot-password', {
+      method: 'POST',
+      body: payload,
+    })
+  }
+
+
 
   function refreshOnce(): Promise<void> {
     if (token.value == null) {
@@ -78,6 +148,10 @@ export const useAuthStore = defineStore('auth', () => {
     token,
     isAuthenticated,
     login,
+    totp_setup,
+    totp_verify,
+    register,
+    forgotPassword,
     refreshOnce,
     trySilentRefresh,
     logout,

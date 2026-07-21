@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { type HTMLAttributes, reactive, ref } from 'vue'
+import { computed, type HTMLAttributes, reactive, ref } from 'vue'
 import { cn } from '@/lib/utils.ts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { useAuthStore } from '@/stores/auth.ts'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Spinner } from '@/components/ui/spinner'
 
 const props = defineProps<{
@@ -15,9 +15,16 @@ const props = defineProps<{
 
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 
 const loading = ref(false)
 const errorMessage = ref('')
+
+const banner = computed(() => {
+  if (route.query.registered) return 'Account created — please sign in.'
+  if (route.query.reset) return 'Password updated — please sign in.'
+  return null
+})
 
 const form = reactive({
   email: '',
@@ -58,7 +65,8 @@ async function onSubmit() {
     })
     router.push('/dashboard')
   } catch (error: any) {
-    errorMessage.value = error.response?.status === 401 ? 'Invalid email or password' : 'Unexpected error occurred'
+    errorMessage.value =
+      error.response?.status === 401 ? 'Invalid email or password' : 'Unexpected error occurred'
   } finally {
     loading.value = false
   }
@@ -73,6 +81,9 @@ async function onSubmit() {
         <CardDescription> Enter your email below to login to your account </CardDescription>
       </CardHeader>
       <CardContent>
+        <p v-if="banner" class="mb-4 text-sm text-center text-green-600">
+          {{ banner }}
+        </p>
         <form @submit.prevent="onSubmit">
           <FieldGroup>
             <Field>
