@@ -44,6 +44,7 @@ async function onSubmit() {
   <div class="mx-auto max-w-sm space-y-6 py-10">
     <template v-if="step === 'email'">
       <h1 class="text-xl font-semibold">Reset your password</h1>
+      <p>Enter your email</p>
       <Input v-model="email" type="email" placeholder="you@example.com" aria-label="Email" />
       <Button class="w-full" @click="goToReset">Continue</Button>
     </template>

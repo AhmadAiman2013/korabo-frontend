@@ -104,9 +104,9 @@ async function onSubmit() {
             <Field>
               <div class="flex items-center">
                 <FieldLabel for="password"> Password </FieldLabel>
-                <a href="#" class="ml-auto inline-block text-sm underline-offset-4 hover:underline">
-                  Forgot your password?
-                </a>
+                <p class="ml-auto inline-block text-sm underline-offset-4 hover:underline">
+                  <RouterLink to="/forgot-password"> Forgot your password? </RouterLink>
+                </p>
               </div>
               <Input
                 id="password"

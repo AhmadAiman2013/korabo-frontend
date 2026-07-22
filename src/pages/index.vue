@@ -137,7 +137,7 @@ const auth = useAuthStore()
         Create your first study group in under a minute. It's free to start.
       </p>
       <Button size="lg" class="mt-8" as-child>
-        <RouterLink to="/login">
+        <RouterLink to="/signup">
           Create your account
           <ArrowRight class="ml-1 h-4 w-4" />
         </RouterLink>

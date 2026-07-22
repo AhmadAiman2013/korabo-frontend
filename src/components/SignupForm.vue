@@ -35,7 +35,7 @@ async function onSubmit() {
   try {
     const data = await auth.totp_setup({ email: email.value })
     store.setSetup(email.value, data.otpauth_url)
-    router.push('/register/verify')
+    router.push('/signup/verify')
   } catch (e: any) {
     error.value = e?.response?.data?.status ?? 'something went wrong, try again'
   } finally {
