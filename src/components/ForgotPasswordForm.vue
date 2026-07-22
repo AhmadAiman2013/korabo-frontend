@@ -11,7 +11,7 @@ const auth = useAuthStore()
 
 const step = ref<'email' | 'reset'>('email')
 const email = ref('')
-const code = ref<string[]>([])
+const code = ref<string>('')
 const newPassword = ref('')
 const error = ref('')
 const loading = ref(false)
@@ -27,13 +27,13 @@ async function onSubmit() {
   try {
     await auth.forgotPassword({
       email: email.value,
-      code: code.value.join(''),
+      code: code.value,
       new_password: newPassword.value,
     })
     router.push('/login?reset=1')
   } catch (e: any) {
     error.value = e?.response?.data?.status ?? 'invalid code or request'
-    code.value = []
+    code.value = ''
   } finally {
     loading.value = false
   }
