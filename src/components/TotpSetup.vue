@@ -18,7 +18,7 @@ if (!store.email) {
   router.replace('/register')
 }
 
-const code = ref<string[]>([])
+const code = ref<string>('')
 const password = ref('')
 const error = ref('')
 const loading = ref(false)
@@ -55,7 +55,7 @@ async function regenerate() {
     store.setSetup(store.email, data.otpauth_url)
     remaining.value = Math.max(0, store.expiresAt - Date.now())
     expired.value = false
-    code.value = []
+    code.value = ''
   } catch {
     error.value = 'could not refresh code, try again'
   } finally {
@@ -70,7 +70,7 @@ async function onSubmit() {
   try {
     await auth.totp_verify({
       email: store.email,
-      code: code.value.join(''),
+      code: code.value,
     })
     await auth.register({
       email: store.email,
@@ -80,7 +80,7 @@ async function onSubmit() {
     router.push('/login?registered=1')
   } catch (e: any) {
     error.value = e?.response?.data?.status ?? 'invalid code, try again'
-    code.value = []
+    code.value = ''
   } finally {
     loading.value = false
   }
@@ -133,7 +133,7 @@ async function onSubmit() {
     </div>
 
     <Button
-      :disabled="expired || loading || code.join('').length < 6 || !password"
+      :disabled="expired || loading || code.length < 6 || !password"
       class="w-full disabled:opacity-60"
       @click="onSubmit"
     >
