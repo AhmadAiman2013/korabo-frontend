@@ -44,6 +44,12 @@ export interface TransferOwnershipRequest {
   new_owner_id: string
 }
 
+export interface MyMembership {
+  is_member: boolean
+  role: MemberRole | null
+  status: MemberStatus | null
+}
+
 export async function getMyGroups(): Promise<Group[]> {
   const response = await http<{ groups: Group[] }>('/group/users/me', {
     method: 'GET',
@@ -107,4 +113,8 @@ export async function transferOwnership(
     method: 'POST',
     body: payload,
   })
+}
+
+export async function getMyMembership(groupId: string): Promise<MyMembership> {
+  return await http<MyMembership>(`/members/${groupId}/me`, { method: 'GET' })
 }

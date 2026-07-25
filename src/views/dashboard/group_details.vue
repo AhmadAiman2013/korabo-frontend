@@ -5,11 +5,13 @@ import { computed, onMounted, ref } from 'vue'
 import {
   approveMember,
   getGroup,
+  getMyMembership,
   type GroupMember,
   joinGroup,
   leaveGroup,
   listMembers,
   type ListMembersResponse,
+  type MyMembership,
   removeMember,
   transferOwnership,
 } from '@/api/group.ts'
@@ -52,11 +54,10 @@ const selectedNewOwner = ref<string | null>(null)
 const transferSubmitting = ref(false)
 const joinLeaveSubmitting = ref(false)
 
+const isMember = computed(() => selfMembership.value?.is_member ?? false)
+const isPending = computed(() => selfMembership.value?.status === 'pending')
 const selfUserId = computed(() => profileStore.selfProfile?.user_id ?? null)
 
-const selfMember = computed(() => members.value.find((m) => m.user_id === selfUserId.value) ?? null)
-const isMember = computed(() => !!selfMember.value)
-const isPending = computed(() => selfMember.value?.status === 'pending')
 
 // members other than self, active only, used as candidates for ownership transfer
 const transferCandidates = computed(() =>
@@ -117,15 +118,20 @@ onMounted(async () => {
   loading.value = true
   error.value = null
   try {
-    await Promise.all([loadGroup(), loadMembers()])
+    await Promise.all([loadGroup(), loadMyMembership()])
 
-    await loadMemberProfiles()
-  } catch (e: any) {
-    if (e?.response?.status === 403) {
-      forbidden.value = true
-    } else {
-      error.value = 'Failed to load members.'
+    try {
+      await loadMembers()
+      await loadMemberProfiles()
+    } catch (e: any) {
+      if (e?.response?.status === 403) {
+        forbidden.value = true
+      } else {
+        toast.error("Something went wrong")
+      }
     }
+  } catch (e: any) {
+    error.value = 'Failed to load group.'
   } finally {
     loading.value = false
   }
@@ -161,8 +167,9 @@ async function handleJoin() {
     }
 
     if (isPrivateGroup.value) {
-      toast.success('Request sent — waiting for the owner to approve.')
-      // no point polling: as a pending member we likely can't read the list yet
+      forbidden.value = true
+      await refreshSelfMembership()
+      toast.success('Joined group')
       return
     }
 
@@ -197,8 +204,8 @@ async function doLeave() {
     members.value = members.value.filter((m) => m.user_id !== leavingUserId)
 
     if (isPrivateGroup.value) {
-      // we no longer have access to a private group's member list once we've left
       forbidden.value = true
+      await refreshSelfMembership()
       toast.success('Left group')
       return
     }
@@ -237,6 +244,7 @@ async function confirmTransferAndLeave() {
 
     if (isPrivateGroup.value) {
       forbidden.value = true
+      await refreshSelfMembership()
       toast.success('Ownership transferred, and you left the group')
       return
     }
@@ -368,6 +376,17 @@ async function applyServerState(res: { members: GroupMember[]; isOwner: boolean 
   members.value = res.members
   isOwner.value = res.isOwner
   await loadMemberProfiles()
+}
+
+// new endpoint
+const selfMembership = ref<MyMembership | null>(null)
+
+async function loadMyMembership() {
+  selfMembership.value = await getMyMembership(groupId.value)
+}
+
+async function refreshSelfMembership() {
+  selfMembership.value = await getMyMembership(groupId.value)
 }
 </script>
 
