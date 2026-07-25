@@ -58,7 +58,6 @@ const isMember = computed(() => selfMembership.value?.is_member ?? false)
 const isPending = computed(() => selfMembership.value?.status === 'pending')
 const selfUserId = computed(() => profileStore.selfProfile?.user_id ?? null)
 
-
 // members other than self, active only, used as candidates for ownership transfer
 const transferCandidates = computed(() =>
   members.value.filter((m) => m.user_id !== selfUserId.value && m.status === 'active'),
@@ -127,7 +126,7 @@ onMounted(async () => {
       if (e?.response?.status === 403) {
         forbidden.value = true
       } else {
-        toast.error("Something went wrong")
+        toast.error('Something went wrong')
       }
     }
   } catch (e: any) {
@@ -147,7 +146,6 @@ function goToProfileDetails(userId: string) {
 }
 
 // group interaction
-
 async function handleJoin() {
   joinLeaveSubmitting.value = true
   try {
@@ -165,6 +163,8 @@ async function handleJoin() {
         },
       ]
     }
+    // optimistic flip, so the button/badge updates immediately
+    selfMembership.value = { is_member: true, role: 'member', status: 'pending' }
 
     if (isPrivateGroup.value) {
       forbidden.value = true
@@ -175,6 +175,7 @@ async function handleJoin() {
 
     const result = await pollMembersUntil((ms) => ms.some((m) => m.user_id === selfUserId.value))
     await applyServerState(result)
+    await refreshSelfMembership()
     toast.success('Joined group')
     if (!result.settled) {
       toast.info('Still syncing — refresh in a moment if it looks off.')
@@ -202,6 +203,8 @@ async function doLeave() {
     await leaveGroup(groupId.value)
 
     members.value = members.value.filter((m) => m.user_id !== leavingUserId)
+    // optimistic flip
+    selfMembership.value = { is_member: false, role: null, status: null }
 
     if (isPrivateGroup.value) {
       forbidden.value = true
@@ -215,9 +218,10 @@ async function doLeave() {
       forbidden.value = true
     } else {
       await applyServerState(result)
-      if (!result.settled) {
-        toast.info('Still syncing — refresh in a moment if it looks off.')
-      }
+    }
+    await refreshSelfMembership()
+    if (!result.lostAccess && !result.settled) {
+      toast.info('Still syncing — refresh in a moment if it looks off.')
     }
     toast.success('Left group')
   } catch (e) {
@@ -239,6 +243,7 @@ async function confirmTransferAndLeave() {
     members.value = members.value
       .filter((m) => m.user_id !== leavingUserId)
       .map((m) => (m.user_id === newOwnerId ? { ...m, role: 'owner' } : m))
+    selfMembership.value = { is_member: false, role: null, status: null }
 
     showTransferDialog.value = false
 
@@ -258,9 +263,10 @@ async function confirmTransferAndLeave() {
       forbidden.value = true
     } else {
       await applyServerState(result)
-      if (!result.settled) {
-        toast.info('Still syncing — refresh in a moment if it looks off.')
-      }
+    }
+    await refreshSelfMembership()
+    if (!result.lostAccess && !result.settled) {
+      toast.info('Still syncing — refresh in a moment if it looks off.')
     }
     toast.success('Ownership transferred, and you left the group')
   } catch (e) {
@@ -271,11 +277,9 @@ async function confirmTransferAndLeave() {
 }
 
 async function handleApprove(userId: string) {
-  const key = `approve:${userId}`
-  setBusy(key, true)
+  setBusy(userId, true)
   try {
     await approveMember(groupId.value, userId)
-    // optimistic
     members.value = members.value.map((m) =>
       m.user_id === userId ? { ...m, status: 'active' } : m,
     )
@@ -291,16 +295,14 @@ async function handleApprove(userId: string) {
   } catch (e) {
     toast.error('Failed to approve member.')
   } finally {
-    setBusy(key, false)
+    setBusy(userId, false)
   }
 }
 
 async function handleRemove(userId: string) {
-  const key = `remove:${userId}`
-  setBusy(key, true)
+  setBusy(userId, true)
   try {
     await removeMember(groupId.value, userId)
-    // optimistic
     members.value = members.value.filter((m) => m.user_id !== userId)
 
     const result = await pollMembersUntil((ms) => !ms.some((m) => m.user_id === userId))
@@ -312,18 +314,16 @@ async function handleRemove(userId: string) {
   } catch (e) {
     toast.error('Failed to remove member.')
   } finally {
-    setBusy(key, false)
+    setBusy(userId, false)
   }
 }
 
 async function handleDirectTransfer(userId: string) {
   if (!selfUserId.value) return
-  const key = `transfer:${userId}`
-  setBusy(key, true)
+  setBusy(userId, true)
   try {
     await transferOwnership(groupId.value, selfUserId.value, { new_owner_id: userId })
 
-    // optimistic
     members.value = members.value.map((m) => {
       if (m.user_id === userId) return { ...m, role: 'owner' }
       if (m.user_id === selfUserId.value) return { ...m, role: 'member' }
@@ -342,7 +342,7 @@ async function handleDirectTransfer(userId: string) {
   } catch (e) {
     toast.error('Failed to transfer ownership.')
   } finally {
-    setBusy(key, false)
+    setBusy(userId, false)
   }
 }
 
