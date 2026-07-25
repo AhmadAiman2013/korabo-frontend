@@ -1,27 +1,77 @@
 <script setup lang="ts">
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useGroupStore } from '@/stores/group.ts'
 import { computed, onMounted, ref } from 'vue'
-import { getGroup, type GroupMember, listMembers } from '@/api/group.ts'
-import { Lock, Globe, Users, Tags } from '@lucide/vue'
+import {
+  approveMember,
+  getGroup,
+  type GroupMember,
+  joinGroup,
+  leaveGroup,
+  listMembers,
+  removeMember,
+  transferOwnership,
+} from '@/api/group.ts'
+import { Lock, Globe, Users, Tags, Loader } from '@lucide/vue'
 
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { useProfileStore } from '@/stores/profile.ts'
 import { getUsersProfile } from '@/api/user.ts'
 import { adjectives, animals, uniqueNamesGenerator } from 'unique-names-generator'
+import { toast } from 'vue-sonner'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { RadioGroup } from '@/components/ui/radio-group'
+import { Label } from '@/components/ui/label'
 
 const route = useRoute()
+const router = useRouter()
 const groupStore = useGroupStore()
 
 const groupId = computed(() => route.params.groupId as string)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const members = ref<GroupMember[]>([])
-const memberCount = ref(0)
 const isOwner = ref(false)
 const profileStore = useProfileStore()
 const forbidden = ref(false)
+
+const pendingActions = ref<Set<string>>(new Set())
+const showTransferDialog = ref(false)
+const selectedNewOwner = ref<string | null>(null)
+const transferSubmitting = ref(false)
+const joinLeaveSubmitting = ref(false)
+
+const selfUserId = computed(() => profileStore.selfProfile?.user_id ?? null)
+
+const selfMember = computed(() => members.value.find((m) => m.user_id === selfUserId.value) ?? null)
+const isMember = computed(() => !!selfMember.value)
+const isPending = computed(() => selfMember.value?.status === 'pending')
+
+// members other than self, active only, used as candidates for ownership transfer
+const transferCandidates = computed(() =>
+  members.value.filter((m) => m.user_id !== selfUserId.value && m.status === 'active'),
+)
+
+function isBusy(key: string) {
+  return pendingActions.value.has(key)
+}
+
+function setBusy(key: string, busy: boolean) {
+  const next = new Set(pendingActions.value)
+  if (busy) next.add(key)
+  else next.delete(key)
+  pendingActions.value = next
+}
 
 async function loadGroup() {
   const group = await getGroup(groupId.value)
@@ -31,7 +81,6 @@ async function loadGroup() {
 async function loadMembers() {
   const res = await listMembers(groupId.value)
   members.value = res.members
-  memberCount.value = res.count
   isOwner.value = res.is_owner
 }
 
@@ -44,6 +93,11 @@ async function loadMemberProfiles() {
       }
     }),
   )
+}
+
+async function refreshMembers() {
+  await loadMembers()
+  await loadMemberProfiles()
 }
 
 function generateFallbackName(seed: string) {
@@ -80,32 +134,160 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+function goToProfileDetails(userId: string) {
+  const profile = profileStore.getUserProfile(userId)
+  console.log('goToProfileDetails', profile)
+  if (profile) {
+    profileStore.setProfile(profile)
+  }
+  router.push(`${route.path}/profile/${userId}`)
+}
+
+// group interaction
+
+async function handleJoin() {
+  joinLeaveSubmitting.value = true
+  try {
+    await joinGroup(groupId.value)
+    await refreshMembers()
+    toast.success('Joined group')
+  } catch (e) {
+    toast.error('Failed to join group.')
+  } finally {
+    joinLeaveSubmitting.value = false
+  }
+}
+
+function handleLeaveClick() {
+  if (isOwner.value) {
+    selectedNewOwner.value = null
+    showTransferDialog.value = true
+    return
+  }
+  void doLeave()
+}
+
+async function doLeave() {
+  joinLeaveSubmitting.value = true
+  try {
+    await leaveGroup(groupId.value)
+    await refreshMembers()
+    toast.success('Left group')
+  } catch (e) {
+    toast.error('Failed to leave group.')
+  } finally {
+    joinLeaveSubmitting.value = false
+  }
+}
+
+async function confirmTransferAndLeave() {
+  if (!selfUserId.value || !selectedNewOwner.value) return
+  transferSubmitting.value = true
+  try {
+    await transferOwnership(groupId.value, selfUserId.value, {
+      new_owner_id: selectedNewOwner.value,
+    })
+    await leaveGroup(groupId.value)
+    showTransferDialog.value = false
+    await refreshMembers()
+    toast.success('Ownership transferred, and you left the group')
+  } catch (e) {
+    toast.error('Failed to transfer ownership and leave.')
+  } finally {
+    transferSubmitting.value = false
+  }
+}
+
+async function handleApprove(userId: string) {
+  const key = `approve:${userId}`
+  setBusy(key, true)
+  try {
+    await approveMember(groupId.value, userId)
+    await refreshMembers()
+    toast.success('Member approved')
+  } catch (e) {
+    toast.error('Failed to approve member.')
+  } finally {
+    setBusy(key, false)
+  }
+}
+
+async function handleRemove(userId: string) {
+  const key = `remove:${userId}`
+  setBusy(key, true)
+  try {
+    await removeMember(groupId.value, userId)
+    await refreshMembers()
+    toast.success('Member removed')
+  } catch (e) {
+    toast.error('Failed to remove member.')
+  } finally {
+    setBusy(key, false)
+  }
+}
+
+async function handleDirectTransfer(userId: string) {
+  if (!selfUserId.value) return
+  const key = `transfer:${userId}`
+  setBusy(key, true)
+  try {
+    await transferOwnership(groupId.value, selfUserId.value, { new_owner_id: userId })
+    await refreshMembers()
+    toast.success('Ownership transferred')
+  } catch (e) {
+    toast.error('Failed to transfer ownership.')
+  } finally {
+    setBusy(key, false)
+  }
+}
+
+
 </script>
 
 <template>
-  <div v-if="loading" class="flex flex-col gap-4 p-6">
+  <div v-if="loading" class="flex flex-col gap-6 p-6">
     <Skeleton class="h-8 w-64" />
     <Skeleton class="h-4 w-96" />
     <Skeleton class="h-40 w-full" />
   </div>
-
   <div v-else-if="error || !groupStore.currentGroup" class="p-6 text-destructive">
     {{ error || 'Group not found.' }}
   </div>
 
   <div v-else class="flex flex-col gap-6 p-6">
     <div class="flex flex-col gap-2">
-      <div class="flex items-center gap-2">
-        <h1 class="text-2xl font-semibold">{{ groupStore.currentGroup.name }}</h1>
-        <Badge
-          :variant="groupStore.currentGroup.group_type === 'private' ? 'secondary' : 'default'"
-        >
-          <component
-            :is="groupStore.currentGroup.group_type === 'private' ? Lock : Globe"
-            class="mr-1 h-3 w-3"
-          />
-          {{ groupStore.currentGroup.group_type }}
-        </Badge>
+      <div class="flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <h1 class="text-2xl font-semibold">{{ groupStore.currentGroup.name }}</h1>
+          <Badge
+            :variant="groupStore.currentGroup.group_type === 'private' ? 'secondary' : 'default'"
+          >
+            <component
+              :is="groupStore.currentGroup.group_type === 'private' ? Lock : Globe"
+              class="mr-1 h-3 w-3"
+            />
+            {{ groupStore.currentGroup.group_type }}
+          </Badge>
+        </div>
+
+        <div>
+          <Button v-if="!isMember" size="sm" :disabled="joinLeaveSubmitting" @click="handleJoin">
+            <Loader v-if="joinLeaveSubmitting" class=" mr-1 h-4 w-4 animate-spin" />
+            Join
+          </Button>
+          <Button
+            v-else-if="!isPending"
+            size="sm"
+            variant="outline"
+            :disabled="joinLeaveSubmitting"
+            @click="handleLeaveClick"
+          >
+            <Loader v-if="joinLeaveSubmitting" class=" mr-1 h-4 w-4 animate-spin" />
+            Leave
+          </Button>
+          <Badge v-else variant="outline">Pending approval</Badge>
+        </div>
       </div>
 
       <p class="text-muted-foreground">{{ groupStore.currentGroup.description }}</p>
@@ -117,10 +299,13 @@ onMounted(async () => {
           {{ tag }}
         </Badge>
       </div>
-
       <div class="flex items-center gap-1 text-sm text-muted-foreground">
         <Users class="h-4 w-4" />
-        <span>{{ memberCount }} member{{ memberCount === 1 ? '' : 's' }}</span>
+        <span
+          >{{ groupStore.currentGroup.member_count }} member{{
+            groupStore.currentGroup.member_count === 1 ? '' : 's'
+          }}</span
+        >
       </div>
     </div>
 
@@ -135,19 +320,58 @@ onMounted(async () => {
         <p class="text-sm font-medium">Members are private</p>
         <p class="text-xs text-muted-foreground">Join this group to see who's a member.</p>
       </div>
-
       <div v-else class="flex flex-col divide-y rounded-md border">
         <div v-for="m in members" :key="m.user_id" class="flex items-center justify-between p-3">
-          <span>
+          <span @click="goToProfileDetails(m.user_id)" class="cursor-pointer hover:underline">
             {{ displayMemberName(m.user_id) }}
           </span>
 
           <div class="flex items-center gap-2">
-            <Badge v-if="m.status === 'pending'" variant="outline"> pending </Badge>
-
-            <Badge :variant="m.role === 'owner' ? 'default' : 'secondary'">
+            <Badge
+              v-if="profileStore && m.user_id === profileStore.selfProfile?.user_id"
+              class="bg-green-500 text-white hover:bg-green-600"
+            >
+              You
+            </Badge>
+            <Badge v-else-if="m.status === 'pending'" variant="outline"> Pending </Badge>
+            <Badge v-else :variant="m.role === 'owner' ? 'default' : 'secondary'">
               {{ m.role }}
             </Badge>
+
+            <!-- owner-only actions on other members -->
+            <template v-if="isOwner && m.user_id !== selfUserId">
+              <Button
+                v-if="m.status === 'pending'"
+                size="sm"
+                variant="outline"
+                :disabled="isBusy(`approve:${m.user_id}`)"
+                @click="handleApprove(m.user_id)"
+              >
+                <Loader v-if="isBusy(`approve:${m.user_id}`)" class="mr-1 h-4 w-4 animate-spin" />
+                Approve
+              </Button>
+
+              <Button
+                v-if="m.status === 'active'"
+                size="sm"
+                variant="ghost"
+                :disabled="isBusy(`transfer:${m.user_id}`)"
+                @click="handleDirectTransfer(m.user_id)"
+              >
+                <Loader v-if="isBusy(`transfer:${m.user_id}`)" class="mr-1 h-4 w-4 animate-spin" />
+                Make owner
+              </Button>
+
+              <Button
+                size="sm"
+                variant="destructive"
+                :disabled="isBusy(`remove:${m.user_id}`)"
+                @click="handleRemove(m.user_id)"
+              >
+                <Loader v-if="isBusy(`remove:${m.user_id}`)" class="mr-1 h-4 w-4 animate-spin" />
+                Remove
+              </Button>
+            </template>
           </div>
         </div>
         <div v-if="members.length === 0" class="p-4 text-center text-sm text-muted-foreground">
@@ -155,6 +379,47 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+
+    <Dialog v-model:open="showTransferDialog">
+      <DialogTrigger class="hidden" />
+
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Transfer ownership before leaving</DialogTitle>
+          <DialogDescription>
+            You're the owner of this group. Pick another member to take over ownership before you
+            leave.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div v-if="transferCandidates.length === 0" class="text-sm text-muted-foreground">
+          There are no other active members to transfer ownership to. Approve or add a member first.
+        </div>
+        <RadioGroup v-else v-model="selectedNewOwner" class="flex flex-col gap-2">
+          <div
+            v-for="c in transferCandidates"
+            :key="c.user_id"
+            class="flex items-center gap-2 rounded-md border p-2"
+          >
+            <RadioGroupItem :id="c.user_id" :value="c.user_id" />
+            <Label :for="c.user_id" class="cursor-pointer">
+              {{ displayMemberName(c.user_id) }}
+            </Label>
+          </div>
+        </RadioGroup>
+
+        <DialogFooter>
+          <Button variant="outline" @click="showTransferDialog = false">Cancel</Button>
+          <Button
+            :disabled="!selectedNewOwner || transferSubmitting"
+            @click="confirmTransferAndLeave"
+          >
+            <Loader v-if="transferSubmitting" class="mr-1 h-4 w-4 animate-spin" />
+            Transfer & leave
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 

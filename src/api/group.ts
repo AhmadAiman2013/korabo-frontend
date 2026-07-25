@@ -40,6 +40,10 @@ export interface ListMembersResponse {
   is_owner: boolean
 }
 
+export interface TransferOwnershipRequest {
+  new_owner_id: string
+}
+
 export async function getMyGroups(): Promise<Group[]> {
   const response = await http<{ groups: Group[] }>('/group/users/me', {
     method: 'GET',
@@ -75,5 +79,32 @@ export async function getGroup(groupId: string): Promise<Group> {
 export async function listMembers(groupId: string): Promise<ListMembersResponse> {
   return await http<ListMembersResponse>(`/members/${groupId}/members`, {
     method: 'GET',
+  })
+}
+
+export async function joinGroup(groupId: string): Promise<void> {
+  await http<void>(`/members/${groupId}/join`, { method: 'POST' })
+}
+
+export async function leaveGroup(groupId: string): Promise<void> {
+  await http<void>(`/members/${groupId}/leave`, { method: 'DELETE' })
+}
+
+export async function approveMember(groupId: string, userId: string): Promise<void> {
+  await http<void>(`/members/${groupId}/members/${userId}/approve`, { method: 'POST' })
+}
+
+export async function removeMember(groupId: string, userId: string): Promise<void> {
+  await http<void>(`/members/${groupId}/members/${userId}/remove`, { method: 'DELETE' })
+}
+
+export async function transferOwnership(
+  groupId: string,
+  userId: string,
+  payload: TransferOwnershipRequest,
+): Promise<void> {
+  await http<void>(`/members/${groupId}/members/${userId}/transfer-ownership`, {
+    method: 'POST',
+    body: payload,
   })
 }

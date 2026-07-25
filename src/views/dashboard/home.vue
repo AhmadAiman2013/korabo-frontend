@@ -57,19 +57,12 @@ function goToGroupDetails(groupId: string) {
             <Card
               v-for="group in groupStore.selfGroups"
               :key="group.group_id"
-              :class="[
-                'cursor-pointer transition-colors hover:bg-muted',
-
-              ]"
+              :class="['cursor-pointer transition-colors hover:bg-muted']"
               @click="goToGroupDetails(group.group_id)"
             >
               <CardHeader>
                 <CardTitle>{{ group.name }}</CardTitle>
-                <Badge
-                  :variant="
-                    group.group_type === 'private' ? 'outline' : 'default'
-                  "
-                >
+                <Badge :variant="group.group_type === 'private' ? 'outline' : 'default'">
                   <component
                     :is="group.group_type === 'private' ? Lock : Globe"
                     class="mr-1 h-3 w-3"

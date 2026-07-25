@@ -8,9 +8,11 @@ import ForgotPassword from '@/pages/forgotpassword/index.vue'
 import DashboardHome from '@/views/dashboard/home.vue'
 import Groups from '@/views/dashboard/groups.vue'
 import GroupDetails from '@/views/dashboard/group_details.vue'
+import Profile from  '@/views/dashboard/profile.vue'
 import { useAuthStore } from '@/stores/auth.ts'
 import { useRegistrationFlowStore } from '@/stores/registrationFlow.ts'
 import { useGroupStore } from '@/stores/group.ts'
+import { useProfileStore } from '@/stores/profile.ts';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -33,6 +35,14 @@ const router = createRouter({
           },
         },
         {
+          path: 'profile',
+          name: 'dashboard-profile',
+          component: Profile,
+          meta: {
+            breads: 'My Profile',
+          },
+        },
+        {
           path: 'groups',
           name: 'dashboard-groups-root',
           component: RouterView,
@@ -51,6 +61,26 @@ const router = createRouter({
               component: GroupDetails,
               meta: {
                 breads: () => useGroupStore().currentGroup?.name ?? 'Group',
+              },
+            },
+            {
+              path: ':groupId/profile/:userId',
+              name: 'dashboard-group-member-profile',
+              component: Profile,
+              meta: {
+                // returns an array: injects the missing "group" crumb manually
+                breads: (route: { params: { groupId: any } }) => [
+                  {
+                    title: useGroupStore().currentGroup?.name ?? 'Group',
+                    to: {
+                      name: 'dashboard-group-detail',
+                      params: { groupId: route.params.groupId },
+                    },
+                  },
+                  {
+                    title: useProfileStore().fallbackName,
+                  },
+                ],
               },
             },
           ],

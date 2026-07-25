@@ -66,9 +66,11 @@ function generateFallbackName(seed: string) {
   })
 }
 
-
 const displayName = computed(() => {
-  return profileStore.selfProfile?.name ?? generateFallbackName(profileStore.selfProfile?.user_id || props.seed)
+  return (
+    profileStore.selfProfile?.name ??
+    generateFallbackName(profileStore.selfProfile?.user_id || props.seed)
+  )
 })
 
 onMounted(async () => {
@@ -139,9 +141,11 @@ onMounted(async () => {
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
           <DropdownMenuGroup>
-            <DropdownMenuItem>
-              <BadgeCheck />
-              Account
+            <DropdownMenuItem as-child>
+              <RouterLink to="/dashboard/profile">
+                <BadgeCheck />
+                <span>Account</span>
+              </RouterLink>
             </DropdownMenuItem>
             <DropdownMenuItem>
               <Bell />

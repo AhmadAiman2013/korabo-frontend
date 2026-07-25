@@ -22,10 +22,17 @@ const router = useRouter()
 const breadcrumbs = computed(() => {
   return route.matched
     .filter((r) => r.meta.breads)
-    .map((r) => ({
-      title: typeof r.meta.breads === 'function' ? r.meta.breads() : r.meta.breads,
-      path: r.name ? router.resolve({ name: r.name }).path : r.path,
-    }))
+    .flatMap((r) => {
+      const result = typeof r.meta.breads === 'function' ? r.meta.breads(route) : r.meta.breads
+
+      // Normalize to an array of { title, path }
+      const items = Array.isArray(result) ? result : [{ title: result, to: { name: r.name } }]
+
+      return items.map((item) => ({
+        title: item.title,
+        path: item.to ? router.resolve(item.to).path : r.path,
+      }))
+    })
 })
 </script>
 

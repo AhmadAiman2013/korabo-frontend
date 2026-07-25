@@ -15,8 +15,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Globe, Lock, User2 } from '@lucide/vue'
 import router from '@/router'
+import { useRoute } from 'vue-router'
 
 const store = useGroupStore()
+const route = useRoute()
 const { groups, loading } = storeToRefs(store)
 const search = ref('')
 
@@ -32,7 +34,7 @@ const filteredGroups = computed(() => {
 })
 
 function goToGroupDetails(groupId: string) {
-  router.push(`/dashboard/groups/${groupId}`)
+  router.push(`${route.path}/${groupId}`)
 }
 
 onMounted(() => {
