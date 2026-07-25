@@ -12,29 +12,21 @@ import {
 } from '@/components/ui/breadcrumb'
 import { Separator } from '@/components/ui/separator'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
-import { useGroupStore } from '@/stores/group.ts'
-import { onMounted } from 'vue'
-import { getMyGroups } from '@/api/group.ts'
-import CreateGroupDialog from '@/components/CreateGroupDialog.vue'
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import ModeToggle from '@/components/ModeToggle.vue'
 
-const groupStore = useGroupStore()
+const route = useRoute()
+const router = useRouter()
 
-onMounted(async () => {
-  const groups = await getMyGroups()
-
-  groupStore.setGroups(groups)
+const breadcrumbs = computed(() => {
+  return route.matched
+    .filter((r) => r.meta.breads)
+    .map((r) => ({
+      title: typeof r.meta.breads === 'function' ? r.meta.breads() : r.meta.breads,
+      path: r.name ? router.resolve({ name: r.name }).path : r.path,
+    }))
 })
-
-function handleCreated(group: any) {
-  groupStore.groups.push(group)
-
-  groupStore.selectGroup(group)
-}
-
-function selectGroup(group: any) {
-  groupStore.selectGroup(group)
-}
 </script>
 
 <template>
@@ -42,62 +34,35 @@ function selectGroup(group: any) {
     <AppSidebar />
     <SidebarInset>
       <header
-        class="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12"
+        class="flex h-16 justify-between items-center px-4 shrink-0 gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12"
       >
-        <div class="flex items-center gap-2 px-4">
+        <div class="flex items-center gap-2">
           <SidebarTrigger class="-ml-1" />
           <Separator orientation="vertical" class="mr-2 data-[orientation=vertical]:h-4" />
           <Breadcrumb>
             <BreadcrumbList>
-              <BreadcrumbItem class="hidden md:block">
-                <BreadcrumbLink href="#"> Building Your Application </BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator class="hidden md:block" />
-              <BreadcrumbItem>
-                <BreadcrumbPage>Data Fetching</BreadcrumbPage>
-              </BreadcrumbItem>
+              <template v-for="(crumb, i) in breadcrumbs" :key="crumb.path">
+                <BreadcrumbItem class="hidden md:block">
+                  <BreadcrumbPage v-if="i === breadcrumbs.length - 1">
+                    {{ crumb.title }}
+                  </BreadcrumbPage>
+
+                  <BreadcrumbLink v-else as-child>
+                    <RouterLink :to="crumb.path">
+                      {{ crumb.title }}
+                    </RouterLink>
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+
+                <BreadcrumbSeparator v-if="i < breadcrumbs.length - 1" class="hidden md:block" />
+              </template>
             </BreadcrumbList>
           </Breadcrumb>
         </div>
+
+        <ModeToggle />
       </header>
-      <div class="flex flex-1 flex-col gap-4 p-4 pt-0">
-        <div class="space-y-6">
-          <h1 class="text-3xl font-bold">Welcome</h1>
-
-          <div>
-            <h2 class="mb-3 text-xl font-semibold">Your Groups</h2>
-
-            <div class="grid gap-4 md:grid-cols-3">
-              <Card
-                v-for="group in groupStore.groups"
-                :key="group.id"
-                class="cursor-pointer hover:bg-muted"
-                @click="selectGroup(group)"
-              >
-                <CardHeader>
-                  <CardTitle>
-                    {{ group.name }}
-                  </CardTitle>
-
-                  <CardDescription>
-                    {{ group.description }}
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-            </div>
-          </div>
-
-          <CreateGroupDialog @created="handleCreated" />
-
-          <div v-if="groupStore.currentGroup" class="rounded-xl border p-5">
-            Current group:
-
-            <strong>
-              {{ groupStore.currentGroup.name }}
-            </strong>
-          </div>
-        </div>
-      </div>
+      <RouterView />
     </SidebarInset>
   </SidebarProvider>
 </template>

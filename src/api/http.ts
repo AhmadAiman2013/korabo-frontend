@@ -1,6 +1,7 @@
 import { ofetch } from 'ofetch'
 import { useAuthStore } from '@/stores/auth.ts'
 import router from '@/router'
+import { toast } from 'vue-sonner'
 
 export const http = ofetch.create({
   baseURL: import.meta.env.VITE_API_URL,
@@ -17,18 +18,23 @@ export const http = ofetch.create({
   },
 
   async onResponseError({ request, response }) {
-    if (response.status !== 401) return
-
     const url = typeof request === 'string' ? request : request.url
-    if (url.includes('/auth/refresh') || url.includes('/auth/login')) return
 
-    const auth = useAuthStore()
-    try {
-      await auth.refreshOnce()
-    } catch {
-      auth.clearToken()
-      await router.push('/login')
-      throw new Error('Session expired')
+    if (response.status === 401) {
+      if (url.includes('/auth/refresh') || url.includes('/auth/login')) return
+
+      const auth = useAuthStore()
+      try {
+        await auth.refreshOnce()
+      } catch {
+        auth.clearToken()
+        toast.error('Session expired, please log in again')
+        await router.push('/login')
+      }
+      return
     }
-  },
+
+    const message = response._data?.message ?? 'Something went wrong'
+    toast.error(message)
+  }
 })

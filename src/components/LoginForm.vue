@@ -63,7 +63,7 @@ async function onSubmit() {
       email: form.email,
       password: form.password,
     })
-    router.push('/dashboard')
+    router.push('/dashboard/home')
   } catch (error: any) {
     errorMessage.value =
       error.response?.status === 401 ? 'Invalid email or password' : 'Unexpected error occurred'

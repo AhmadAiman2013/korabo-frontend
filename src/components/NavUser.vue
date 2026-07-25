@@ -21,21 +21,26 @@ import { useAuthStore } from '@/stores/auth.ts'
 import router from '@/router'
 import { Style, Avatar as DicebearAvatar } from '@dicebear/core'
 import definition from '@dicebear/styles/glyphs.json' with { type: 'json' }
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { useProfileStore } from '@/stores/profile.ts'
+import { getProfile } from '@/api/profile.ts'
+import { Skeleton } from '@/components/ui/skeleton'
+import { adjectives, animals, uniqueNamesGenerator } from 'unique-names-generator'
 
 const props = withDefaults(
   defineProps<{
-    user: { name: string; email: string; avatar: string }
     seed?: string
   }>(),
   {
-    seed: 'Ahmad',
+    seed: 'User',
   },
 )
 
 const { isMobile } = useSidebar()
 
 const auth = useAuthStore()
+const profileStore = useProfileStore()
+const loading = ref<boolean>(true)
 
 async function handleLogout() {
   await auth.logout()
@@ -44,12 +49,36 @@ async function handleLogout() {
 
 const style = new Style(definition)
 
-const avatarDice = computed(() =>
-  new DicebearAvatar(style, {
-    seed: props.seed,
+const avatarDice = computed(() => {
+  const userSeed = profileStore.selfProfile?.user_id || props.seed
+  return new DicebearAvatar(style, {
+    seed: userSeed,
     size: 128,
-  }).toDataUri(),
-)
+  }).toDataUri()
+})
+
+function generateFallbackName(seed: string) {
+  return uniqueNamesGenerator({
+    dictionaries: [adjectives, animals],
+    separator: ' ',
+    style: 'capital',
+    seed,
+  })
+}
+
+
+const displayName = computed(() => {
+  return profileStore.selfProfile?.name ?? generateFallbackName(profileStore.selfProfile?.user_id || props.seed)
+})
+
+onMounted(async () => {
+  try {
+    const profile = await getProfile()
+    profileStore.setSelfProfile(profile)
+  } finally {
+    loading.value = false
+  }
+})
 </script>
 
 <template>
@@ -61,15 +90,33 @@ const avatarDice = computed(() =>
             size="lg"
             class="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
           >
-            <Avatar class="h-8 w-8 rounded-lg">
-              <AvatarImage :src="avatarDice" :alt="user.name" />
-              <AvatarFallback class="rounded-lg"> CN </AvatarFallback>
+            <Avatar class="size-8 rounded-lg">
+              <template v-if="loading">
+                <Skeleton class="size-8 rounded-lg" />
+              </template>
+              <template v-else>
+                <AvatarImage :src="avatarDice" :alt="profileStore.selfProfile?.name" />
+                <AvatarFallback>CN</AvatarFallback>
+              </template>
             </Avatar>
+
             <div class="grid flex-1 text-left text-sm leading-tight">
-              <span class="truncate font-medium">{{ user.name }}</span>
-              <span class="truncate text-xs">{{ user.email }}</span>
+              <template v-if="loading">
+                <Skeleton class="h-4 w-24 mb-1" />
+                <Skeleton class="h-3 w-36" />
+              </template>
+              <template v-else>
+                <span class="truncate font-medium py-0.5">{{ displayName }}</span>
+                <span class="truncate text-xs">{{ profileStore.selfProfile?.email }}</span>
+              </template>
             </div>
-            <ChevronsUpDown class="ml-auto size-4" />
+
+            <template v-if="loading">
+              <Skeleton class="size-4 rounded" />
+            </template>
+            <template v-else>
+              <ChevronsUpDown class="ml-auto size-4" />
+            </template>
           </SidebarMenuButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent
@@ -81,12 +128,12 @@ const avatarDice = computed(() =>
           <DropdownMenuLabel class="p-0 font-normal">
             <div class="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
               <Avatar class="h-8 w-8 rounded-lg">
-                <AvatarImage :src="avatarDice" :alt="user.name" />
+                <AvatarImage :src="avatarDice" :alt="profileStore.selfProfile?.name" />
                 <AvatarFallback class="rounded-lg"> CN </AvatarFallback>
               </Avatar>
               <div class="grid flex-1 text-left text-sm leading-tight">
-                <span class="truncate font-semibold">{{ user.name }}</span>
-                <span class="truncate text-xs">{{ user.email }}</span>
+                <span class="truncate font-semibold py-0.5">{{ displayName }}</span>
+                <span class="truncate text-xs">{{ profileStore.selfProfile?.email }}</span>
               </div>
             </div>
           </DropdownMenuLabel>

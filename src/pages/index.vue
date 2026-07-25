@@ -57,7 +57,7 @@ const auth = useAuthStore()
           </nav>
           <RouterLink
             v-if="auth.isAuthenticated"
-            to="/dashboard"
+            to="/dashboard/home"
             class="text-lg font-medium text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
           >
             Dashboard

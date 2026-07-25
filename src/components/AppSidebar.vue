@@ -6,15 +6,8 @@ import {
   type SidebarProps,
 } from '@/components/ui/sidebar'
 
-import {
-  BookOpen,
-  Command,
-  Frame,
-  PieChart,
-  SquareTerminal,
-} from '@lucide/vue'
+import { BookOpen, Command, SquareTerminal, UsersRound, LayoutDashboard } from '@lucide/vue'
 import NavMain from '@/components/NavMain.vue'
-import NavProjects from '@/components/NavProjects.vue'
 import NavUser from '@/components/NavUser.vue'
 
 import {
@@ -24,6 +17,7 @@ import {
   SidebarHeader,
   SidebarRail,
 } from '@/components/ui/sidebar'
+import NavPrime from '@/components/NavPrime.vue'
 
 const props = withDefaults(defineProps<SidebarProps>(), {
   collapsible: 'icon',
@@ -31,14 +25,23 @@ const props = withDefaults(defineProps<SidebarProps>(), {
 
 // This is sample data.
 const data = {
-  user: {
-    name: 'shadcn',
-    email: 'm@example.com',
-    avatar: '/avatars/shadcn.jpg',
-  },
+  navPrime: [
+    {
+      title: 'Home',
+      name: 'dashboard-home',
+      icon: LayoutDashboard,
+      url: '/dashboard/home'
+    },
+    {
+      title: 'Groups',
+      name: 'dashboard-groups-root',
+      icon: UsersRound,
+      url: '/dashboard/groups'
+    },
+  ],
   navMain: [
     {
-      title: 'Playground',
+      title: 'Chat',
       url: '#',
       icon: SquareTerminal,
       isActive: true,
@@ -47,18 +50,10 @@ const data = {
           title: 'History',
           url: '#',
         },
-        {
-          title: 'Starred',
-          url: '#',
-        },
-        {
-          title: 'Settings',
-          url: '#',
-        },
       ],
     },
     {
-      title: 'Documentation',
+      title: 'Forum',
       url: '#',
       icon: BookOpen,
       items: [
@@ -66,31 +61,7 @@ const data = {
           title: 'Introduction',
           url: '#',
         },
-        {
-          title: 'Get Started',
-          url: '#',
-        },
-        {
-          title: 'Tutorials',
-          url: '#',
-        },
-        {
-          title: 'Changelog',
-          url: '#',
-        },
       ],
-    },
-  ],
-  projects: [
-    {
-      name: 'Design Engineering',
-      url: '#',
-      icon: Frame,
-    },
-    {
-      name: 'Sales & Marketing',
-      url: '#',
-      icon: PieChart,
     },
   ],
 }
@@ -101,27 +72,27 @@ const data = {
     <SidebarHeader>
       <SidebarMenu>
         <SidebarMenuItem>
-          <SidebarMenuButton size="lg" as-child>
-            <a href="#">
-              <div
-                class="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground"
-              >
-                <Command class="size-4" />
-              </div>
-              <div class="grid flex-1 text-left text-sm leading-tight">
-                <span class="truncate font-medium">Korabo</span>
-              </div>
-            </a>
-          </SidebarMenuButton>
+          <div class="flex items-center">
+            <SidebarMenuButton size="lg" as-child>
+              <a href="#">
+                <div class="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                  <Command class="size-4" />
+                </div>
+                <div class="grid flex-1 text-left text-sm leading-tight">
+                  <span class="truncate font-medium">Korabo</span>
+                </div>
+              </a>
+            </SidebarMenuButton>
+          </div>
         </SidebarMenuItem>
       </SidebarMenu>
     </SidebarHeader>
     <SidebarContent>
+      <NavPrime :items="data.navPrime" />
       <NavMain :items="data.navMain" />
-      <NavProjects :projects="data.projects" />
     </SidebarContent>
     <SidebarFooter>
-      <NavUser :user="data.user" />
+      <NavUser />
     </SidebarFooter>
     <SidebarRail />
   </Sidebar>
