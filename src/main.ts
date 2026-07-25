@@ -14,5 +14,4 @@ const auth = useAuthStore()
 await auth.trySilentRefresh()
 
 app.use(router)
-
 app.mount('#app')
