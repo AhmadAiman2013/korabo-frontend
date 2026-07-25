@@ -9,6 +9,7 @@ import {
   joinGroup,
   leaveGroup,
   listMembers,
+  type ListMembersResponse,
   removeMember,
   transferOwnership,
 } from '@/api/group.ts'
@@ -30,7 +31,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { RadioGroup } from '@/components/ui/radio-group'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 
 const route = useRoute()
@@ -62,14 +63,14 @@ const transferCandidates = computed(() =>
   members.value.filter((m) => m.user_id !== selfUserId.value && m.status === 'active'),
 )
 
-function isBusy(key: string) {
-  return pendingActions.value.has(key)
+function isBusy(userId: string) {
+  return pendingActions.value.has(userId)
 }
 
-function setBusy(key: string, busy: boolean) {
+function setBusy(userId: string, busy: boolean) {
   const next = new Set(pendingActions.value)
-  if (busy) next.add(key)
-  else next.delete(key)
+  if (busy) next.add(userId)
+  else next.delete(userId)
   pendingActions.value = next
 }
 
@@ -93,11 +94,6 @@ async function loadMemberProfiles() {
       }
     }),
   )
-}
-
-async function refreshMembers() {
-  await loadMembers()
-  await loadMemberProfiles()
 }
 
 function generateFallbackName(seed: string) {
@@ -150,8 +146,27 @@ async function handleJoin() {
   joinLeaveSubmitting.value = true
   try {
     await joinGroup(groupId.value)
-    await refreshMembers()
+
+    if (selfUserId.value && !members.value.some((m) => m.user_id === selfUserId.value)) {
+      members.value = [
+        ...members.value,
+        {
+          group_id: groupId.value,
+          user_id: selfUserId.value,
+          role: 'member',
+          status: 'pending',
+          joined_at: new Date().toISOString(),
+        },
+      ]
+    }
+
+    const result = await pollMembersUntil((ms) => ms.some((m) => m.user_id === selfUserId.value))
+    await applyServerState(result)
     toast.success('Joined group')
+
+    if (!result.settled) {
+      toast.info('Still syncing — refresh in a moment if it looks off.')
+    }
   } catch (e) {
     toast.error('Failed to join group.')
   } finally {
@@ -170,10 +185,19 @@ function handleLeaveClick() {
 
 async function doLeave() {
   joinLeaveSubmitting.value = true
+  const leavingUserId = selfUserId.value
   try {
     await leaveGroup(groupId.value)
-    await refreshMembers()
+
+    // optimistic: remove self immediately
+    members.value = members.value.filter((m) => m.user_id !== leavingUserId)
+
+    const result = await pollMembersUntil((ms) => !ms.some((m) => m.user_id === leavingUserId))
+    await applyServerState(result)
     toast.success('Left group')
+    if (!result.settled) {
+      toast.info('Still syncing — refresh in a moment if it looks off.')
+    }
   } catch (e) {
     toast.error('Failed to leave group.')
   } finally {
@@ -183,15 +207,30 @@ async function doLeave() {
 
 async function confirmTransferAndLeave() {
   if (!selfUserId.value || !selectedNewOwner.value) return
+  const newOwnerId = selectedNewOwner.value
+  const leavingUserId = selfUserId.value
   transferSubmitting.value = true
   try {
     await transferOwnership(groupId.value, selfUserId.value, {
       new_owner_id: selectedNewOwner.value,
     })
     await leaveGroup(groupId.value)
+
+    members.value = members.value
+      .filter((m) => m.user_id !== leavingUserId)
+      .map((m) => (m.user_id === newOwnerId ? { ...m, role: 'owner' } : m))
+
     showTransferDialog.value = false
-    await refreshMembers()
+    const result = await pollMembersUntil(
+      (ms) =>
+        !ms.some((m) => m.user_id === leavingUserId) &&
+        ms.some((m) => m.user_id === newOwnerId && m.role === 'owner'),
+    )
+    await applyServerState(result)
     toast.success('Ownership transferred, and you left the group')
+    if (!result.settled) {
+      toast.info('Still syncing — refresh in a moment if it looks off.')
+    }
   } catch (e) {
     toast.error('Failed to transfer ownership and leave.')
   } finally {
@@ -204,8 +243,19 @@ async function handleApprove(userId: string) {
   setBusy(key, true)
   try {
     await approveMember(groupId.value, userId)
-    await refreshMembers()
+    // optimistic
+    members.value = members.value.map((m) =>
+      m.user_id === userId ? { ...m, status: 'active' } : m,
+    )
+
+    const result = await pollMembersUntil((ms) =>
+      ms.some((m) => m.user_id === userId && m.status === 'active'),
+    )
+    await applyServerState(result)
     toast.success('Member approved')
+    if (!result.settled) {
+      toast.info('Still syncing — refresh in a moment if it looks off.')
+    }
   } catch (e) {
     toast.error('Failed to approve member.')
   } finally {
@@ -218,8 +268,15 @@ async function handleRemove(userId: string) {
   setBusy(key, true)
   try {
     await removeMember(groupId.value, userId)
-    await refreshMembers()
+    // optimistic
+    members.value = members.value.filter((m) => m.user_id !== userId)
+
+    const result = await pollMembersUntil((ms) => !ms.some((m) => m.user_id === userId))
+    await applyServerState(result)
     toast.success('Member removed')
+    if (!result.settled) {
+      toast.info('Still syncing — refresh in a moment if it looks off.')
+    }
   } catch (e) {
     toast.error('Failed to remove member.')
   } finally {
@@ -233,8 +290,23 @@ async function handleDirectTransfer(userId: string) {
   setBusy(key, true)
   try {
     await transferOwnership(groupId.value, selfUserId.value, { new_owner_id: userId })
-    await refreshMembers()
+
+    // optimistic
+    members.value = members.value.map((m) => {
+      if (m.user_id === userId) return { ...m, role: 'owner' }
+      if (m.user_id === selfUserId.value) return { ...m, role: 'member' }
+      return m
+    })
+    isOwner.value = false
+
+    const result = await pollMembersUntil((ms) =>
+      ms.some((m) => m.user_id === userId && m.role === 'owner'),
+    )
+    await applyServerState(result)
     toast.success('Ownership transferred')
+    if (!result.settled) {
+      toast.info('Still syncing — refresh in a moment if it looks off.')
+    }
   } catch (e) {
     toast.error('Failed to transfer ownership.')
   } finally {
@@ -242,7 +314,26 @@ async function handleDirectTransfer(userId: string) {
   }
 }
 
+async function pollMembersUntil(
+  predicate: (members: GroupMember[], isOwner: boolean) => boolean,
+  { attempts = 6, intervalMs = 700 }: { attempts?: number; intervalMs?: number } = {},
+): Promise<{ members: GroupMember[]; isOwner: boolean; settled: boolean }> {
+  let last: ListMembersResponse | null = null
+  for (let i = 0; i < attempts; i++) {
+    last = await listMembers(groupId.value)
+    if (predicate(last.members, last.is_owner)) {
+      return { members: last.members, isOwner: last.is_owner, settled: true }
+    }
+    await new Promise((r) => setTimeout(r, intervalMs))
+  }
+  return { members: last!.members, isOwner: last!.is_owner, settled: false }
+}
 
+async function applyServerState(res: { members: GroupMember[]; isOwner: boolean }) {
+  members.value = res.members
+  isOwner.value = res.isOwner
+  await loadMemberProfiles()
+}
 </script>
 
 <template>
@@ -273,7 +364,7 @@ async function handleDirectTransfer(userId: string) {
 
         <div>
           <Button v-if="!isMember" size="sm" :disabled="joinLeaveSubmitting" @click="handleJoin">
-            <Loader v-if="joinLeaveSubmitting" class=" mr-1 h-4 w-4 animate-spin" />
+            <Loader v-if="joinLeaveSubmitting" class="mr-1 h-4 w-4 animate-spin" />
             Join
           </Button>
           <Button
@@ -283,7 +374,7 @@ async function handleDirectTransfer(userId: string) {
             :disabled="joinLeaveSubmitting"
             @click="handleLeaveClick"
           >
-            <Loader v-if="joinLeaveSubmitting" class=" mr-1 h-4 w-4 animate-spin" />
+            <Loader v-if="joinLeaveSubmitting" class="mr-1 h-4 w-4 animate-spin" />
             Leave
           </Button>
           <Badge v-else variant="outline">Pending approval</Badge>
@@ -344,10 +435,10 @@ async function handleDirectTransfer(userId: string) {
                 v-if="m.status === 'pending'"
                 size="sm"
                 variant="outline"
-                :disabled="isBusy(`approve:${m.user_id}`)"
+                :disabled="isBusy(m.user_id)"
                 @click="handleApprove(m.user_id)"
               >
-                <Loader v-if="isBusy(`approve:${m.user_id}`)" class="mr-1 h-4 w-4 animate-spin" />
+                <Loader v-if="isBusy(m.user_id)" class="mr-1 h-4 w-4 animate-spin" />
                 Approve
               </Button>
 
@@ -355,20 +446,20 @@ async function handleDirectTransfer(userId: string) {
                 v-if="m.status === 'active'"
                 size="sm"
                 variant="ghost"
-                :disabled="isBusy(`transfer:${m.user_id}`)"
+                :disabled="isBusy(m.user_id)"
                 @click="handleDirectTransfer(m.user_id)"
               >
-                <Loader v-if="isBusy(`transfer:${m.user_id}`)" class="mr-1 h-4 w-4 animate-spin" />
+                <Loader v-if="isBusy(m.user_id)" class="mr-1 h-4 w-4 animate-spin" />
                 Make owner
               </Button>
 
               <Button
                 size="sm"
                 variant="destructive"
-                :disabled="isBusy(`remove:${m.user_id}`)"
+                :disabled="isBusy(m.user_id)"
                 @click="handleRemove(m.user_id)"
               >
-                <Loader v-if="isBusy(`remove:${m.user_id}`)" class="mr-1 h-4 w-4 animate-spin" />
+                <Loader v-if="isBusy(m.user_id)" class="mr-1 h-4 w-4 animate-spin" />
                 Remove
               </Button>
             </template>
