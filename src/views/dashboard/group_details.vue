@@ -160,10 +160,15 @@ async function handleJoin() {
       ]
     }
 
+    if (isPrivateGroup.value) {
+      toast.success('Request sent — waiting for the owner to approve.')
+      // no point polling: as a pending member we likely can't read the list yet
+      return
+    }
+
     const result = await pollMembersUntil((ms) => ms.some((m) => m.user_id === selfUserId.value))
     await applyServerState(result)
     toast.success('Joined group')
-
     if (!result.settled) {
       toast.info('Still syncing — refresh in a moment if it looks off.')
     }
@@ -189,15 +194,25 @@ async function doLeave() {
   try {
     await leaveGroup(groupId.value)
 
-    // optimistic: remove self immediately
     members.value = members.value.filter((m) => m.user_id !== leavingUserId)
 
-    const result = await pollMembersUntil((ms) => !ms.some((m) => m.user_id === leavingUserId))
-    await applyServerState(result)
-    toast.success('Left group')
-    if (!result.settled) {
-      toast.info('Still syncing — refresh in a moment if it looks off.')
+    if (isPrivateGroup.value) {
+      // we no longer have access to a private group's member list once we've left
+      forbidden.value = true
+      toast.success('Left group')
+      return
     }
+
+    const result = await pollMembersUntil((ms) => !ms.some((m) => m.user_id === leavingUserId))
+    if (result.lostAccess) {
+      forbidden.value = true
+    } else {
+      await applyServerState(result)
+      if (!result.settled) {
+        toast.info('Still syncing — refresh in a moment if it looks off.')
+      }
+    }
+    toast.success('Left group')
   } catch (e) {
     toast.error('Failed to leave group.')
   } finally {
@@ -211,9 +226,7 @@ async function confirmTransferAndLeave() {
   const leavingUserId = selfUserId.value
   transferSubmitting.value = true
   try {
-    await transferOwnership(groupId.value, selfUserId.value, {
-      new_owner_id: selectedNewOwner.value,
-    })
+    await transferOwnership(groupId.value, leavingUserId, { new_owner_id: newOwnerId })
     await leaveGroup(groupId.value)
 
     members.value = members.value
@@ -221,16 +234,27 @@ async function confirmTransferAndLeave() {
       .map((m) => (m.user_id === newOwnerId ? { ...m, role: 'owner' } : m))
 
     showTransferDialog.value = false
+
+    if (isPrivateGroup.value) {
+      forbidden.value = true
+      toast.success('Ownership transferred, and you left the group')
+      return
+    }
+
     const result = await pollMembersUntil(
       (ms) =>
         !ms.some((m) => m.user_id === leavingUserId) &&
         ms.some((m) => m.user_id === newOwnerId && m.role === 'owner'),
     )
-    await applyServerState(result)
-    toast.success('Ownership transferred, and you left the group')
-    if (!result.settled) {
-      toast.info('Still syncing — refresh in a moment if it looks off.')
+    if (result.lostAccess) {
+      forbidden.value = true
+    } else {
+      await applyServerState(result)
+      if (!result.settled) {
+        toast.info('Still syncing — refresh in a moment if it looks off.')
+      }
     }
+    toast.success('Ownership transferred, and you left the group')
   } catch (e) {
     toast.error('Failed to transfer ownership and leave.')
   } finally {
@@ -314,19 +338,30 @@ async function handleDirectTransfer(userId: string) {
   }
 }
 
+const isPrivateGroup = computed(() => groupStore.currentGroup?.group_type === 'private')
+
+// same as before, but now safe against 403s mid-poll: treat a thrown error
+// as "stop polling, we've lost access" rather than an unhandled rejection
 async function pollMembersUntil(
   predicate: (members: GroupMember[], isOwner: boolean) => boolean,
   { attempts = 6, intervalMs = 700 }: { attempts?: number; intervalMs?: number } = {},
-): Promise<{ members: GroupMember[]; isOwner: boolean; settled: boolean }> {
+): Promise<{ members: GroupMember[]; isOwner: boolean; settled: boolean; lostAccess: boolean }> {
   let last: ListMembersResponse | null = null
   for (let i = 0; i < attempts; i++) {
-    last = await listMembers(groupId.value)
+    try {
+      last = await listMembers(groupId.value)
+    } catch (e: any) {
+      if (e?.response?.status === 403) {
+        return { members: [], isOwner: false, settled: false, lostAccess: true }
+      }
+      throw e
+    }
     if (predicate(last.members, last.is_owner)) {
-      return { members: last.members, isOwner: last.is_owner, settled: true }
+      return { members: last.members, isOwner: last.is_owner, settled: true, lostAccess: false }
     }
     await new Promise((r) => setTimeout(r, intervalMs))
   }
-  return { members: last!.members, isOwner: last!.is_owner, settled: false }
+  return { members: last!.members, isOwner: last!.is_owner, settled: false, lostAccess: false }
 }
 
 async function applyServerState(res: { members: GroupMember[]; isOwner: boolean }) {

@@ -34,6 +34,10 @@ export const http = ofetch.create({
       return
     }
 
+    if (response.status === 403) {
+      return
+    }
+
     const message = response._data?.message ?? 'Something went wrong'
     toast.error(message)
   }
