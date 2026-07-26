@@ -14,6 +14,7 @@ import { useChatUnreadStore } from '@/stores/chatUnread.ts'
 import { useChatMessagesStore } from '@/stores/chatMessages.ts'
 import { debouncedMarkSeen } from '@/composables/useMarkSeen.ts'
 import { Separator } from '@/components/ui/separator'
+import { adjectives, animals, uniqueNamesGenerator } from 'unique-names-generator'
 
 const route = useRoute()
 const groupId = computed(() => route.params.groupId as string)
@@ -67,8 +68,17 @@ function avatarFor(senderId: string) {
   return new DicebearAvatar(style, { seed, size: 128 }).toDataUri()
 }
 
+function generateFallbackName(seed: string) {
+  return uniqueNamesGenerator({
+    dictionaries: [adjectives, animals],
+    separator: ' ',
+    style: 'capital',
+    seed,
+  })
+}
+
 function nameFor(senderId: string) {
-  return profileStore.getUserProfile(senderId)?.name ?? senderId
+  return profileStore.getUserProfile(senderId)?.name ?? generateFallbackName(senderId)
 }
 
 function handleSend() {
@@ -76,6 +86,11 @@ function handleSend() {
   if (!text) return
   socket.sendMessage(groupId.value, text)
   draft.value = ''
+}
+
+function formatTime(isoString: string) {
+  const date = new Date(isoString)
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
 let offMessageLocal: () => void
@@ -160,6 +175,12 @@ onUnmounted(() => {
                 {{ nameFor(m.sender_id) }}
               </p>
               <p>{{ m.content }}</p>
+              <p
+                class="text-[10px] mt-1 opacity-60"
+                :class="m.sender_id === currentUserId ? 'text-right' : 'text-left'"
+              >
+                {{ formatTime(m.created_at) }}
+              </p>
             </div>
           </div>
         </template>
