@@ -6,7 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Send } from '@lucide/vue'
+import { Send, Loader2 } from '@lucide/vue'
 import { Style, Avatar as DicebearAvatar } from '@dicebear/core'
 import definition from '@dicebear/styles/glyphs.json' with { type: 'json' }
 import { useProfileStore } from '@/stores/profile.ts'
@@ -180,10 +180,11 @@ onUnmounted(() => {
               </p>
               <p>{{ m.content }}</p>
               <p
-                class="text-[10px] mt-1 opacity-60"
-                :class="m.sender_id === currentUserId ? 'text-right' : 'text-left'"
+                class="text-[10px] mt-1 opacity-60 flex items-center gap-1"
+                :class="m.sender_id === currentUserId ? 'justify-end' : 'justify-start'"
               >
-                {{ formatTime(m.created_at) }}
+                <Loader2 v-if="m.pending" class="h-3 w-3 animate-spin" />
+                <span v-if="!m.pending">{{ formatTime(m.created_at) }}</span>
               </p>
             </div>
           </div>
