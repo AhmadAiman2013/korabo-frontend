@@ -27,7 +27,7 @@ export const useGroupStore = defineStore('group', {
     },
 
     addGroup(group: Group) {
-      this.groups.push(group)
+      this.selfGroups.push(group)
     },
 
     async fetchSelfGroupsOnce() {

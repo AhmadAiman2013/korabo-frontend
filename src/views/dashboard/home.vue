@@ -4,22 +4,11 @@ import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/ca
 import { Skeleton } from '@/components/ui/skeleton'
 import CreateGroupDialog from '@/components/CreateGroupDialog.vue'
 import { useGroupStore } from '@/stores/group.ts'
-import { onMounted, ref } from 'vue'
-import { getMyGroups, type Group } from '@/api/group.ts'
+import { type Group } from '@/api/group.ts'
 import router from '@/router'
 import { Badge } from '@/components/ui/badge'
 
 const groupStore = useGroupStore()
-const loading = ref(true)
-
-onMounted(async () => {
-  try {
-    const groups = await getMyGroups()
-    groupStore.setSelfGroups(groups)
-  } finally {
-    loading.value = false
-  }
-})
 
 function handleCreated(group: Group) {
   groupStore.addGroup(group)
@@ -39,7 +28,7 @@ function goToGroupDetails(groupId: string) {
         <h2 class="mb-3 text-xl font-semibold">Your Groups</h2>
 
         <div class="grid gap-4 md:grid-cols-3">
-          <template v-if="loading">
+          <template v-if="groupStore.loading">
             <Skeleton v-for="i in 3" :key="i" class="h-28 rounded-xl" />
           </template>
 
