@@ -167,8 +167,8 @@ onUnmounted(() => {
             class="flex gap-2 max-w-[75%]"
             :class="m.sender_id === currentUserId ? 'self-end flex-row-reverse' : 'self-start'"
           >
-            <div>
-              <Avatar class="relative">
+            <div class="relative shrink-0">
+              <Avatar>
                 <AvatarImage :src="avatarFor(m.sender_id)" class="h-8 w-8 shrink-0" alt="avatar" />
                 <AvatarFallback>{{ nameFor(m.sender_id).charAt(0).toUpperCase() }}</AvatarFallback>
               </Avatar>
