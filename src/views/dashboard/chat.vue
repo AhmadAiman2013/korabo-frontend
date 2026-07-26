@@ -16,6 +16,9 @@ import { debouncedMarkSeen } from '@/composables/useMarkSeen.ts'
 import { Separator } from '@/components/ui/separator'
 import { adjectives, animals, uniqueNamesGenerator } from 'unique-names-generator'
 import { usePresenceStore } from '@/stores/presence.ts'
+import { getMyMembership, type MyMembership } from '@/api/group.ts'
+import { toast } from 'vue-sonner'
+import { Skeleton } from '@/components/ui/skeleton'
 
 const route = useRoute()
 const groupId = computed(() => route.params.groupId as string)
@@ -26,11 +29,17 @@ const chatMessages = useChatMessagesStore()
 const unread = useChatUnreadStore()
 const presence = usePresenceStore()
 
+const loading = ref(false)
 const draft = ref('')
 const scrollRef = ref<InstanceType<typeof ScrollArea> | null>(null)
+const selfMembership = ref<MyMembership | null>(null)
 
 const currentUserId = computed(() => profileStore.selfProfile?.user_id)
 const messages = computed(() => chatMessages.byGroup[groupId.value]?.messages ?? [])
+
+async function loadMyMembership() {
+  selfMembership.value = await getMyMembership(groupId.value)
+}
 
 function getViewport() {
   return scrollRef.value?.$el?.querySelector(
@@ -102,6 +111,15 @@ function formatTime(isoString: string) {
 let offMessageLocal: () => void
 
 onMounted(async () => {
+  try {
+    loading.value = true
+    await loadMyMembership()
+  } catch (err) {
+    toast.error('failed to load membership')
+    loading.value = false
+  }
+  loading.value = false
+
   unread.setNearBottom(groupId.value, true)
 
   await chatMessages.fetchInitial(groupId.value)
@@ -140,6 +158,9 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <div v-if="loading" class="flex flex-col h-full">
+    <Skeleton class="h-full w-full" />
+  </div>
   <div class="flex flex-col h-full">
     <ScrollArea ref="scrollRef" class="flex-1 px-4">
       <div class="flex flex-col gap-3 py-4">
