@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Users, MessageSquareText, BookOpen, Zap, ArrowRight } from '@lucide/vue'
 import { useAuthStore } from '@/stores/auth.ts'
+import router from '@/router'
 
 const features = [
   {
@@ -37,6 +38,11 @@ const features = [
 ]
 
 const auth = useAuthStore()
+
+async function handleLogout() {
+  await auth.logout()
+  router.push('/login')
+}
 </script>
 
 <template>
@@ -64,11 +70,12 @@ const auth = useAuthStore()
           </RouterLink>
         </div>
         <div class="flex items-center gap-3">
-          <Button variant="ghost" as-child>
-            <RouterLink to="/login"><span class="text-lg">Log In</span></RouterLink>
+          <Button v-if="auth.isAuthenticated" as-child @click="handleLogout">
+            <span>Log Out</span>
           </Button>
-          <Button as-child>
-            <RouterLink to="/login"><span class="text-lg">Get Started</span></RouterLink>
+
+          <Button v-else as-child>
+            <RouterLink to="/login"><span class="text-lg">Log In</span></RouterLink>
           </Button>
         </div>
       </div>
