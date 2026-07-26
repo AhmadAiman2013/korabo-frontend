@@ -26,6 +26,7 @@ export function useProfile(userIdParam: Ref<string | undefined>) {
       loading.value = false
     }
   }
+  {}
 
   const display = computed(() => {
     if (isOwn.value) {

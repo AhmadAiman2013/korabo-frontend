@@ -16,30 +16,28 @@ import { debouncedMarkSeen } from '@/composables/useMarkSeen.ts'
 import { Separator } from '@/components/ui/separator'
 import { adjectives, animals, uniqueNamesGenerator } from 'unique-names-generator'
 import { usePresenceStore } from '@/stores/presence.ts'
-import { getMyMembership, type MyMembership } from '@/api/group.ts'
-import { toast } from 'vue-sonner'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useMemberStore } from '@/stores/member.ts'
+import { toast } from 'vue-sonner'
+import { getUsersProfile } from '@/api/user.ts'
 
 const route = useRoute()
 const groupId = computed(() => route.params.groupId as string)
+const members = computed(() => memberStore.members)
 
 const socket = useSocketStore()
 const profileStore = useProfileStore()
 const chatMessages = useChatMessagesStore()
 const unread = useChatUnreadStore()
 const presence = usePresenceStore()
+const memberStore = useMemberStore()
 
 const loading = ref(false)
 const draft = ref('')
 const scrollRef = ref<InstanceType<typeof ScrollArea> | null>(null)
-const selfMembership = ref<MyMembership | null>(null)
 
 const currentUserId = computed(() => profileStore.selfProfile?.user_id)
 const messages = computed(() => chatMessages.byGroup[groupId.value]?.messages ?? [])
-
-async function loadMyMembership() {
-  selfMembership.value = await getMyMembership(groupId.value)
-}
 
 function getViewport() {
   return scrollRef.value?.$el?.querySelector(
@@ -89,7 +87,8 @@ function generateFallbackName(seed: string) {
 }
 
 function nameFor(senderId: string) {
-  return profileStore.getUserProfile(senderId)?.name ?? generateFallbackName(senderId)
+  const profile = profileStore.getUserProfile(senderId)
+  return profile?.name || generateFallbackName(senderId)
 }
 
 function handleSend() {
@@ -110,15 +109,32 @@ function formatTime(isoString: string) {
 
 let offMessageLocal: () => void
 
+async function loadMembers() {
+  await memberStore.loadMembers(groupId.value)
+}
+
+async function loadMemberProfiles() {
+  await Promise.all(
+    members.value.map(async (member) => {
+      if (!profileStore.getUserProfile(member.user_id)) {
+        const profile = await getUsersProfile(member.user_id)
+        profileStore.setUserProfile(profile)
+      }
+    }),
+  )
+}
+
 onMounted(async () => {
+  loading.value = true
   try {
-    loading.value = true
-    await loadMyMembership()
-  } catch (err) {
-    toast.error('failed to load membership')
+    await loadMembers()
+    await loadMemberProfiles()
+  } catch (e: any) {
+      toast.error('Something went wrong')
     loading.value = false
-  }
-  loading.value = false
+    }
+
+    loading.value = false
 
   unread.setNearBottom(groupId.value, true)
 
@@ -159,7 +175,23 @@ onUnmounted(() => {
 
 <template>
   <div v-if="loading" class="flex flex-col h-full">
-    <Skeleton class="h-full w-full" />
+    <ScrollArea class="flex-1 px-4">
+      <div class="flex flex-col gap-3 py-4">
+        <template v-for="i in 5" :key="i">
+          <div class="flex gap-2 max-w-[75%]" :class="i % 2 === 0 ? 'self-end flex-row-reverse' : 'self-start'">
+            <Skeleton class="h-8 w-8 rounded-full shrink-0" />
+            <div class="flex flex-col gap-2 flex-1">
+              <Skeleton v-if="i % 2 === 1" class="h-4 w-20" />
+              <Skeleton class="h-12 w-full rounded-lg" />
+            </div>
+          </div>
+        </template>
+      </div>
+    </ScrollArea>
+    <div class="border-t p-3 flex gap-2">
+      <Skeleton class="flex-1 h-10 rounded-md" />
+      <Skeleton class="h-10 w-10 rounded-md" />
+    </div>
   </div>
   <div class="flex flex-col h-full">
     <ScrollArea ref="scrollRef" class="flex-1 px-4">
@@ -191,7 +223,7 @@ onUnmounted(() => {
             <div class="relative shrink-0">
               <Avatar>
                 <AvatarImage :src="avatarFor(m.sender_id)" class="h-8 w-8 shrink-0" alt="avatar" />
-                <AvatarFallback>{{ nameFor(m.sender_id).charAt(0).toUpperCase() }}</AvatarFallback>
+                <AvatarFallback>{{ nameFor(m.sender_id) }}</AvatarFallback>
               </Avatar>
               <span
                 v-if="presence.isOnline(groupId, m.sender_id)"

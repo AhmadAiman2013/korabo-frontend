@@ -1,19 +1,13 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
 import { useGroupStore } from '@/stores/group.ts'
-import { computed, onMounted, ref } from 'vue'
+import { useMemberStore } from '@/stores/member.ts'
+import { computed, onMounted, ref, watch } from 'vue'
 import {
-  approveMember,
   getGroup,
-  getMyMembership,
   type GroupMember,
   joinGroup,
   leaveGroup,
-  listMembers,
-  type ListMembersResponse,
-  type MyMembership,
-  removeMember,
-  transferOwnership,
 } from '@/api/group.ts'
 import { Lock, Globe, Users, Tags, Loader } from '@lucide/vue'
 
@@ -39,12 +33,11 @@ import { Label } from '@/components/ui/label'
 const route = useRoute()
 const router = useRouter()
 const groupStore = useGroupStore()
+const memberStore = useMemberStore()
 
 const groupId = computed(() => route.params.groupId as string)
 const loading = ref(true)
 const error = ref<string | null>(null)
-const members = ref<GroupMember[]>([])
-const isOwner = ref(false)
 const profileStore = useProfileStore()
 const forbidden = ref(false)
 
@@ -53,6 +46,14 @@ const showTransferDialog = ref(false)
 const selectedNewOwner = ref<string | null>(null)
 const transferSubmitting = ref(false)
 const joinLeaveSubmitting = ref(false)
+
+// store-backed reads, unchanged shape from before
+const members = computed(() => memberStore.members)
+const isOwner = computed(() => memberStore.isOwner)
+const selfMembership = computed({
+  get: () => memberStore.selfMembership,
+  set: (v) => (memberStore.selfMembership = v),
+})
 
 const isMember = computed(() => selfMembership.value?.is_member ?? false)
 const isPending = computed(() => selfMembership.value?.status === 'pending')
@@ -80,9 +81,7 @@ async function loadGroup() {
 }
 
 async function loadMembers() {
-  const res = await listMembers(groupId.value)
-  members.value = res.members
-  isOwner.value = res.is_owner
+  await memberStore.loadMembers(groupId.value)
 }
 
 async function loadMemberProfiles() {
@@ -112,6 +111,9 @@ function displayMemberName(userId: string) {
 
   return profile?.name ?? generateFallbackName(userId)
 }
+
+// guards against stale members flashing when navigating between groups
+watch(groupId, (id) => memberStore.resetFor(id), { immediate: true })
 
 onMounted(async () => {
   loading.value = true
@@ -151,17 +153,14 @@ async function handleJoin() {
   try {
     await joinGroup(groupId.value)
 
-    if (selfUserId.value && !members.value.some((m) => m.user_id === selfUserId.value)) {
-      members.value = [
-        ...members.value,
-        {
-          group_id: groupId.value,
-          user_id: selfUserId.value,
-          role: 'member',
-          status: 'pending',
-          joined_at: new Date().toISOString(),
-        },
-      ]
+    if (selfUserId.value) {
+      memberStore.optimisticAddSelf({
+        group_id: groupId.value,
+        user_id: selfUserId.value,
+        role: 'member',
+        status: 'pending',
+        joined_at: new Date().toISOString(),
+      })
     }
     // optimistic flip, so the button/badge updates immediately
     selfMembership.value = { is_member: true, role: 'member', status: 'pending' }
@@ -202,7 +201,7 @@ async function doLeave() {
   try {
     await leaveGroup(groupId.value)
 
-    members.value = members.value.filter((m) => m.user_id !== leavingUserId)
+    if (leavingUserId) memberStore.optimisticRemove(leavingUserId)
     // optimistic flip
     selfMembership.value = { is_member: false, role: null, status: null }
 
@@ -237,12 +236,11 @@ async function confirmTransferAndLeave() {
   const leavingUserId = selfUserId.value
   transferSubmitting.value = true
   try {
-    await transferOwnership(groupId.value, leavingUserId, { new_owner_id: newOwnerId })
+    await memberStore.transfer(groupId.value, leavingUserId, { new_owner_id: newOwnerId })
     await leaveGroup(groupId.value)
 
-    members.value = members.value
-      .filter((m) => m.user_id !== leavingUserId)
-      .map((m) => (m.user_id === newOwnerId ? { ...m, role: 'owner' } : m))
+    memberStore.optimisticRemove(leavingUserId)
+    memberStore.optimisticSetRole(newOwnerId, 'owner')
     selfMembership.value = { is_member: false, role: null, status: null }
 
     showTransferDialog.value = false
@@ -279,10 +277,7 @@ async function confirmTransferAndLeave() {
 async function handleApprove(userId: string) {
   setBusy(userId, true)
   try {
-    await approveMember(groupId.value, userId)
-    members.value = members.value.map((m) =>
-      m.user_id === userId ? { ...m, status: 'active' } : m,
-    )
+    await memberStore.approve(groupId.value, userId)
 
     const result = await pollMembersUntil((ms) =>
       ms.some((m) => m.user_id === userId && m.status === 'active'),
@@ -302,8 +297,7 @@ async function handleApprove(userId: string) {
 async function handleRemove(userId: string) {
   setBusy(userId, true)
   try {
-    await removeMember(groupId.value, userId)
-    members.value = members.value.filter((m) => m.user_id !== userId)
+    await memberStore.remove(groupId.value, userId)
 
     const result = await pollMembersUntil((ms) => !ms.some((m) => m.user_id === userId))
     await applyServerState(result)
@@ -322,14 +316,11 @@ async function handleDirectTransfer(userId: string) {
   if (!selfUserId.value) return
   setBusy(userId, true)
   try {
-    await transferOwnership(groupId.value, selfUserId.value, { new_owner_id: userId })
+    await memberStore.transfer(groupId.value, selfUserId.value, { new_owner_id: userId })
 
-    members.value = members.value.map((m) => {
-      if (m.user_id === userId) return { ...m, role: 'owner' }
-      if (m.user_id === selfUserId.value) return { ...m, role: 'member' }
-      return m
-    })
-    isOwner.value = false
+    memberStore.optimisticSetRole(userId, 'owner')
+    memberStore.optimisticSetRole(selfUserId.value, 'member')
+    memberStore.isOwner = false
 
     const result = await pollMembersUntil((ms) =>
       ms.some((m) => m.user_id === userId && m.role === 'owner'),
@@ -348,45 +339,26 @@ async function handleDirectTransfer(userId: string) {
 
 const isPrivateGroup = computed(() => groupStore.currentGroup?.group_type === 'private')
 
-// same as before, but now safe against 403s mid-poll: treat a thrown error
-// as "stop polling, we've lost access" rather than an unhandled rejection
+// same as before, delegated to the store so other views can reuse it
 async function pollMembersUntil(
   predicate: (members: GroupMember[], isOwner: boolean) => boolean,
-  { attempts = 6, intervalMs = 700 }: { attempts?: number; intervalMs?: number } = {},
-): Promise<{ members: GroupMember[]; isOwner: boolean; settled: boolean; lostAccess: boolean }> {
-  let last: ListMembersResponse | null = null
-  for (let i = 0; i < attempts; i++) {
-    try {
-      last = await listMembers(groupId.value)
-    } catch (e: any) {
-      if (e?.response?.status === 403) {
-        return { members: [], isOwner: false, settled: false, lostAccess: true }
-      }
-      throw e
-    }
-    if (predicate(last.members, last.is_owner)) {
-      return { members: last.members, isOwner: last.is_owner, settled: true, lostAccess: false }
-    }
-    await new Promise((r) => setTimeout(r, intervalMs))
-  }
-  return { members: last!.members, isOwner: last!.is_owner, settled: false, lostAccess: false }
+  opts?: { attempts?: number; intervalMs?: number },
+) {
+  return memberStore.pollMembersUntil(groupId.value, predicate, opts)
 }
 
-async function applyServerState(res: { members: GroupMember[]; isOwner: boolean }) {
-  members.value = res.members
-  isOwner.value = res.isOwner
+async function applyServerState(_: { settled: boolean; lostAccess: boolean }) {
+  // store already applied members/isOwner inside pollMembersUntil on success;
+  // this just needs to refresh profile cache for any newly-visible members
   await loadMemberProfiles()
 }
 
-// new endpoint
-const selfMembership = ref<MyMembership | null>(null)
-
 async function loadMyMembership() {
-  selfMembership.value = await getMyMembership(groupId.value)
+  await memberStore.loadMyMembership(groupId.value)
 }
 
 async function refreshSelfMembership() {
-  selfMembership.value = await getMyMembership(groupId.value)
+  await memberStore.loadMyMembership(groupId.value)
 }
 </script>
 
