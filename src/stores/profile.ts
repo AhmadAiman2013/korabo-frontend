@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import type { UserPublicProfile } from '@/api/user.ts'
+import  { getUsersProfile, type UserPublicProfile } from '@/api/user.ts'
 import type { Profile } from '@/api/profile.ts'
 import { adjectives, animals, uniqueNamesGenerator } from 'unique-names-generator'
 
@@ -39,6 +39,13 @@ export const useProfileStore = defineStore('profile', {
 
     getUserProfile(userId: string) {
       return this.profiles[userId];
+    },
+
+    async ensureUserProfile(userId: string) {
+      if (this.profiles[userId]) return this.profiles[userId]
+      const profile = await getUsersProfile(userId)
+      this.setUserProfile(profile)
+      return profile
     }
   },
 

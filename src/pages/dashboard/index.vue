@@ -12,9 +12,15 @@ import {
 } from '@/components/ui/breadcrumb'
 import { Separator } from '@/components/ui/separator'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ModeToggle from '@/components/ModeToggle.vue'
+import { useSocketStore } from '@/stores/socket.ts'
+import { useChatUnreadStore } from '@/stores/chatUnread.ts'
+import { useGroupStore } from '@/stores/group.ts'
+import { useChatMessagesStore } from '@/stores/chatMessages.ts'
+import type { ChatMessageRecord } from '@/api/chat.ts'
+import { debouncedMarkSeen } from '@/composables/useMarkSeen.ts'
 
 const route = useRoute()
 const router = useRouter()
@@ -33,6 +39,58 @@ const breadcrumbs = computed(() => {
         path: item.to ? router.resolve(item.to).path : r.path,
       }))
     })
+})
+
+const socket = useSocketStore()
+const groupStore = useGroupStore()
+const chatMessages = useChatMessagesStore()
+const unread = useChatUnreadStore()
+
+let offMessage: () => void
+let offHistory: () => void
+
+onMounted(async () => {
+  socket.connect()
+  await groupStore.fetchSelfGroupsOnce()
+
+  offMessage = socket.on('chat.message', (msg) => {
+    const payload = msg.payload as ChatMessageRecord
+    chatMessages.addLiveMessage(payload)
+
+    const viewingThisGroup =
+      route.name === 'dashboard-chat' && route.params.groupId === payload.group_id
+    const safeToMarkSeen =
+      viewingThisGroup && !document.hidden && unread.nearBottom[payload.group_id]
+
+    if (safeToMarkSeen) {
+      debouncedMarkSeen(payload.group_id)
+    } else {
+      unread.addUnseen(payload.group_id, payload.message_id)
+    }
+  })
+
+  offHistory = socket.on('chat.history', (msg) => {
+    const { group_id, messages_ids } = msg.payload
+    unread.setUnseen(group_id, messages_ids)
+  })
+})
+
+watch(
+  () => socket.status,
+  (status) => {
+    if (status === 'OPEN' && groupStore.selfGroups.length) {
+      groupStore.selfGroups.forEach((g) => {
+        socket.joinGroup(g.group_id)
+        socket.requestUnreadIds(g.group_id)
+      })
+    }
+  },
+)
+
+onUnmounted(() => {
+  socket.disconnect()
+  offMessage?.()
+  offHistory?.()
 })
 </script>
 
@@ -66,10 +124,9 @@ const breadcrumbs = computed(() => {
             </BreadcrumbList>
           </Breadcrumb>
         </div>
-
         <ModeToggle />
       </header>
-      <RouterView />
+      <RouterView :key="route.params.groupId as string" />
     </SidebarInset>
   </SidebarProvider>
 </template>

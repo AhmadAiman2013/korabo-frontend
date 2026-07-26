@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { type Group, listGroups } from '@/api/group'
+import { getMyGroups, type Group, listGroups } from '@/api/group'
 
 export const useGroupStore = defineStore('group', {
   state: () => ({
@@ -28,6 +28,17 @@ export const useGroupStore = defineStore('group', {
 
     addGroup(group: Group) {
       this.groups.push(group)
+    },
+
+    async fetchSelfGroupsOnce() {
+      if (this.selfGroups.length || this.loading) return
+      this.loading = true
+      try {
+        const groups = await getMyGroups()
+        this.setSelfGroups(groups)
+      } finally {
+        this.loading = false
+      }
     },
 
     async fetchAllGroups() {

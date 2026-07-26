@@ -8,11 +8,12 @@ import ForgotPassword from '@/pages/forgotpassword/index.vue'
 import DashboardHome from '@/views/dashboard/home.vue'
 import Groups from '@/views/dashboard/groups.vue'
 import GroupDetails from '@/views/dashboard/group_details.vue'
-import Profile from  '@/views/dashboard/profile.vue'
+import Profile from '@/views/dashboard/profile.vue'
+import Chat from '@/views/dashboard/chat.vue'
 import { useAuthStore } from '@/stores/auth.ts'
 import { useRegistrationFlowStore } from '@/stores/registrationFlow.ts'
 import { useGroupStore } from '@/stores/group.ts'
-import { useProfileStore } from '@/stores/profile.ts';
+import { useProfileStore } from '@/stores/profile.ts'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -84,6 +85,17 @@ const router = createRouter({
               },
             },
           ],
+        },
+        {
+          path: 'chat/:groupId',
+          name: 'dashboard-chat',
+          component: Chat,
+          meta: {
+            breads: () =>
+              useGroupStore().selfGroups.find(
+                (g) => g.group_id === router.currentRoute.value.params.groupId,
+              )?.name ?? 'Chat',
+          },
         },
       ],
     },
