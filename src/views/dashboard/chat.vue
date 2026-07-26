@@ -132,13 +132,13 @@ onMounted(async () => {
   } catch (e: any) {
       toast.error('Something went wrong')
     loading.value = false
-    }
-
-    loading.value = false
-
+  }
   unread.setNearBottom(groupId.value, true)
 
   await chatMessages.fetchInitial(groupId.value)
+
+  loading.value = false
+
   unread.takeSnapshot(groupId.value)
 
   scrollToBottom()
