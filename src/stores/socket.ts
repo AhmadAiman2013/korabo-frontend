@@ -77,8 +77,15 @@ export const useSocketStore = defineStore('socket', () => {
   function disconnect() {
     close()
   }
+
   function sendJson(payload: Record<string, any>) {
-    send(JSON.stringify(payload))
+    console.log('[ws] sendJson attempt, status:', status.value, payload)
+    if (status.value !== 'OPEN') {
+      console.warn('[ws] BLOCKED — not OPEN', status.value)
+      return
+    }
+    const sent = send(JSON.stringify(payload))
+    console.log('[ws] send() returned:', sent)
   }
 
   function joinGroup(groupId: string) {
