@@ -174,7 +174,7 @@ onUnmounted(() => {
               </Avatar>
               <span
                 v-if="presence.isOnline(groupId, m.sender_id)"
-                class="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-background"
+                class="absolute top-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-background"
               />
             </div>
             <div
