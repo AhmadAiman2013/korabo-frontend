@@ -35,7 +35,7 @@ export const useChatMessagesStore = defineStore('chatMessages', {
       g.loading = true
       try {
         const res = await getChatHistory({ group_id: groupId, limit })
-        g.messages = [...res.messages].reverse() // confirm ordering assumption with backend
+        g.messages = res.messages
         g.nextCursor = res.next_cursor
         g.loadedOnce = true
       } finally {
@@ -48,7 +48,7 @@ export const useChatMessagesStore = defineStore('chatMessages', {
       g.loading = true
       try {
         const res = await getChatHistory({ group_id: groupId, cursor: g.nextCursor, limit })
-        g.messages = [...res.messages].reverse().concat(g.messages)
+        g.messages = res.messages.concat(g.messages)
         g.nextCursor = res.next_cursor
       } finally {
         g.loading = false
