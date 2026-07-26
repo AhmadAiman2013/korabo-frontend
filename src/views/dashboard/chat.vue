@@ -84,6 +84,10 @@ function nameFor(senderId: string) {
 function handleSend() {
   const text = draft.value.trim()
   if (!text) return
+
+  chatMessages.addOptimisticMessage(groupId.value, currentUserId.value!, text)
+  scrollToBottom() // auto-scroll immediately, don't wait for the ack
+
   socket.sendMessage(groupId.value, text)
   draft.value = ''
 }

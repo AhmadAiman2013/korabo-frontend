@@ -2,12 +2,13 @@ import { http } from '@/api/http.ts'
 
 export interface ChatMessageRecord {
   group_id: string
-  sort_key: string
+  sort_key?: string
   message_id: string
   sender_id: string
   content: string
-  message_type: string
+  message_type?: string
   created_at: string
+  pending?: boolean // client-only, never comes from the server
 }
 
 export interface ChatHistoryRequest {

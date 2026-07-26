@@ -24,11 +24,41 @@ export const useChatMessagesStore = defineStore('chatMessages', {
       }
       return this.byGroup[groupId]
     },
+
+    // called by handleSend — pushes a temp bubble immediately
+    addOptimisticMessage(groupId: string, senderId: string, content: string): string {
+      const g = this.ensureGroup(groupId)
+      const tempId = `temp-${crypto.randomUUID()}`
+      g.messages.push({
+        group_id: groupId,
+        message_id: tempId,
+        sender_id: senderId,
+        content,
+        created_at: new Date().toISOString(),
+        pending: true,
+      })
+      return tempId
+    },
+
+    // called when the real chat.message frame arrives
     addLiveMessage(msg: ChatMessageRecord) {
       const g = this.ensureGroup(msg.group_id)
+
+      // dedupe against a real (non-pending) duplicate, e.g. from a reconnect replay
       if (g.messages.some((m) => m.message_id === msg.message_id)) return
-      g.messages.push(msg)
+
+      // try to reconcile against my own pending optimistic bubble
+      const pendingIndex = g.messages.findIndex(
+        (m) => m.pending && m.sender_id === msg.sender_id && m.content === msg.content,
+      )
+
+      if (pendingIndex !== -1) {
+        g.messages.splice(pendingIndex, 1, msg) // replace temp with real, pending gone
+      } else {
+        g.messages.push(msg)
+      }
     },
+
     async fetchInitial(groupId: string, limit = 30) {
       const g = this.ensureGroup(groupId)
       if (g.loadedOnce || g.loading) return
@@ -42,6 +72,7 @@ export const useChatMessagesStore = defineStore('chatMessages', {
         g.loading = false
       }
     },
+
     async fetchOlder(groupId: string, limit = 30) {
       const g = this.ensureGroup(groupId)
       if (g.loading || !g.nextCursor) return
