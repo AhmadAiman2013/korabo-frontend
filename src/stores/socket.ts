@@ -108,6 +108,10 @@ export const useSocketStore = defineStore('socket', () => {
     sendJson({ action: 'chat.mark-seen', group_id: groupId })
   }
 
+  function requestOnlineUsers(groupId: string) {
+    sendJson({ action: 'chat.online', group_id: groupId })
+  }
+
   return {
     status,
     data,
@@ -121,5 +125,6 @@ export const useSocketStore = defineStore('socket', () => {
     markSeen,
     on,
     onAny,
+    requestOnlineUsers
   }
 })

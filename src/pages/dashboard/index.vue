@@ -21,6 +21,7 @@ import { useGroupStore } from '@/stores/group.ts'
 import { useChatMessagesStore } from '@/stores/chatMessages.ts'
 import type { ChatMessageRecord } from '@/api/chat.ts'
 import { debouncedMarkSeen } from '@/composables/useMarkSeen.ts'
+import { usePresenceStore } from '@/stores/presence.ts'
 
 const route = useRoute()
 const router = useRouter()
@@ -30,13 +31,12 @@ const breadcrumbs = computed(() => {
     .filter((r) => r.meta.breads)
     .flatMap((r) => {
       const result = typeof r.meta.breads === 'function' ? r.meta.breads(route) : r.meta.breads
-
-      // Normalize to an array of { title, path }
       const items = Array.isArray(result) ? result : [{ title: result, to: { name: r.name } }]
 
       return items.map((item) => ({
         title: item.title,
         path: item.to ? router.resolve(item.to).path : r.path,
+        groupId: r.name === 'dashboard-chat' ? (route.params.groupId as string) : undefined,
       }))
     })
 })
@@ -45,9 +45,12 @@ const socket = useSocketStore()
 const groupStore = useGroupStore()
 const chatMessages = useChatMessagesStore()
 const unread = useChatUnreadStore()
+const presence = usePresenceStore()
 
 let offMessage: () => void
 let offHistory: () => void
+let offOnlineSnapshot: () => void
+let offPresence: () => void
 
 onMounted(async () => {
   socket.connect()
@@ -73,6 +76,17 @@ onMounted(async () => {
     const { group_id, messages_ids } = msg.payload
     unread.setUnseen(group_id, messages_ids)
   })
+
+  offOnlineSnapshot = socket.on('chat.online', (msg) => {
+    presence.setSnapshot(msg.payload.group_id, msg.payload.online_user_ids)
+  })
+
+  offPresence = socket.on('chat.presence', (msg) => {
+    const { group_id, user_id, status } = msg.payload
+    status === 'online'
+      ? presence.markOnline(group_id, user_id)
+      : presence.markOffline(group_id, user_id)
+  })
 })
 
 const joinedGroups = new Set<string>()
@@ -85,6 +99,7 @@ watch(
       if (joinedGroups.has(g.group_id)) return
       socket.joinGroup(g.group_id)
       socket.requestUnreadIds(g.group_id)
+      socket.requestOnlineUsers(g.group_id)
       joinedGroups.add(g.group_id)
     })
   },
@@ -105,6 +120,8 @@ onUnmounted(() => {
   socket.disconnect()
   offMessage?.()
   offHistory?.()
+  offOnlineSnapshot?.()
+  offPresence?.()
 })
 </script>
 
@@ -122,8 +139,18 @@ onUnmounted(() => {
             <BreadcrumbList>
               <template v-for="(crumb, i) in breadcrumbs" :key="crumb.path">
                 <BreadcrumbItem class="hidden md:block">
-                  <BreadcrumbPage v-if="i === breadcrumbs.length - 1">
+                  <BreadcrumbPage
+                    v-if="i === breadcrumbs.length - 1"
+                    class="flex items-center gap-2"
+                  >
                     {{ crumb.title }}
+                    <span
+                      v-if="crumb.groupId"
+                      class="flex items-center gap-1 text-xs text-muted-foreground font-normal"
+                    >
+                      <span class="h-1.5 w-1.5 rounded-full bg-green-500" />
+                      {{ presence.countFor(crumb.groupId) }} online
+                    </span>
                   </BreadcrumbPage>
 
                   <BreadcrumbLink v-else as-child>

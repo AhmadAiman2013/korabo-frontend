@@ -12,6 +12,7 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from '@/components/ui/sidebar'
+import { usePresenceStore } from '@/stores/presence.ts'
 
 defineProps<{
   items: {
@@ -22,6 +23,8 @@ defineProps<{
     items?: { title: string; url: string; groupId?: string; unreadCount?: number }[]
   }[]
 }>()
+
+const presence = usePresenceStore()
 </script>
 
 <template>
@@ -50,7 +53,13 @@ defineProps<{
               <SidebarMenuSubItem v-for="subItem in item.items" :key="subItem.title">
                 <SidebarMenuSubButton as-child>
                   <RouterLink :to="subItem.url" class="flex justify-between items-center w-full">
-                    <span>{{ subItem.title }}</span>
+                    <span class="flex items-center gap-1.5">
+                      <span
+                        v-if="subItem.groupId && presence.hasOnline(subItem.groupId)"
+                        class="h-2 w-2 rounded-full bg-green-500 shrink-0"
+                      />
+                      {{ subItem.title }}
+                    </span>
                     <span
                       v-if="subItem.unreadCount"
                       class="text-xs bg-primary text-primary-foreground rounded-full px-1.5"

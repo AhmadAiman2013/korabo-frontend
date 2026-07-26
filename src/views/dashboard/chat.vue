@@ -15,6 +15,7 @@ import { useChatMessagesStore } from '@/stores/chatMessages.ts'
 import { debouncedMarkSeen } from '@/composables/useMarkSeen.ts'
 import { Separator } from '@/components/ui/separator'
 import { adjectives, animals, uniqueNamesGenerator } from 'unique-names-generator'
+import { usePresenceStore } from '@/stores/presence.ts'
 
 const route = useRoute()
 const groupId = computed(() => route.params.groupId as string)
@@ -23,6 +24,7 @@ const socket = useSocketStore()
 const profileStore = useProfileStore()
 const chatMessages = useChatMessagesStore()
 const unread = useChatUnreadStore()
+const presence = usePresenceStore()
 
 const draft = ref('')
 const scrollRef = ref<InstanceType<typeof ScrollArea> | null>(null)
@@ -165,10 +167,16 @@ onUnmounted(() => {
             class="flex gap-2 max-w-[75%]"
             :class="m.sender_id === currentUserId ? 'self-end flex-row-reverse' : 'self-start'"
           >
-            <Avatar>
-              <AvatarImage :src="avatarFor(m.sender_id)" class="h-8 w-8 shrink-0" alt="avatar" />
-              <AvatarFallback>{{ nameFor(m.sender_id).charAt(0).toUpperCase() }}</AvatarFallback>
-            </Avatar>
+            <div>
+              <Avatar class="relative">
+                <AvatarImage :src="avatarFor(m.sender_id)" class="h-8 w-8 shrink-0" alt="avatar" />
+                <AvatarFallback>{{ nameFor(m.sender_id).charAt(0).toUpperCase() }}</AvatarFallback>
+              </Avatar>
+              <span
+                v-if="presence.isOnline(groupId, m.sender_id)"
+                class="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-background"
+              />
+            </div>
             <div
               class="rounded-lg px-3 py-2 text-sm"
               :class="
