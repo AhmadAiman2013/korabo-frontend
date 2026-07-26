@@ -75,14 +75,28 @@ onMounted(async () => {
   })
 })
 
+const joinedGroups = new Set<string>()
+
+watch(
+  [() => socket.status, () => groupStore.selfGroups],
+  ([status, groups]) => {
+    if (status !== 'OPEN' || !groups.length) return
+    groups.forEach((g) => {
+      if (joinedGroups.has(g.group_id)) return
+      socket.joinGroup(g.group_id)
+      socket.requestUnreadIds(g.group_id)
+      joinedGroups.add(g.group_id)
+    })
+  },
+  { immediate: true, deep: true },
+)
+
+// clear so a real reconnect re-joins everything (new connectionId server-side)
 watch(
   () => socket.status,
-  (status) => {
-    if (status === 'OPEN' && groupStore.selfGroups.length) {
-      groupStore.selfGroups.forEach((g) => {
-        socket.joinGroup(g.group_id)
-        socket.requestUnreadIds(g.group_id)
-      })
+  (status, prevStatus) => {
+    if (status !== 'OPEN' && prevStatus === 'OPEN') {
+      joinedGroups.clear()
     }
   },
 )
