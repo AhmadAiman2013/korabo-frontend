@@ -83,7 +83,7 @@ interface Envelope<T> {
 export const forumApi = {
   // ---- Posts ----
   async listPosts(groupId: string, params?: { cursor?: string; limit?: number }) {
-    const r = await http<Envelope<ListPostsResponse>>('/forum/post', {
+    const r = await http<Envelope<ListPostsResponse>>('/forum/posts', {
       method: 'GET',
       query: { group_id: groupId, cursor: params?.cursor, limit: params?.limit },
     })
@@ -91,7 +91,7 @@ export const forumApi = {
   },
 
   async createPost(payload: CreatePostRequest) {
-    const r = await http<Envelope<Post>>('/forum/post', {
+    const r = await http<Envelope<Post>>('/forum/posts', {
       method: 'POST',
       body: payload,
     })
@@ -99,7 +99,7 @@ export const forumApi = {
   },
 
   async updatePost(postId: string, payload: UpdatePostRequest) {
-    const r = await http<Envelope<Post>>(`/forum/post/${postId}`, {
+    const r = await http<Envelope<Post>>(`/forum/posts/${postId}`, {
       method: 'PUT',
       body: payload,
     })
@@ -150,7 +150,7 @@ export const forumApi = {
 
   // ---- Uploads ----
   async getPresignedUpload(payload: PresignUploadRequest) {
-    const r = await http<Envelope<PresignedUpload>>('/forum/post/upload', {
+    const r = await http<Envelope<PresignedUpload>>('/forum/posts/upload', {
       method: 'POST',
       body: payload,
     })
