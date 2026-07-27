@@ -82,65 +82,79 @@ interface Envelope<T> {
 
 export const forumApi = {
   // ---- Posts ----
-  listPosts(groupId: string, params?: { cursor?: string; limit?: number }) {
-    return http<Envelope<ListPostsResponse>>('/post', {
+  async listPosts(groupId: string, params?: { cursor?: string; limit?: number }) {
+    const r = await http<Envelope<ListPostsResponse>>('/forum/post', {
       method: 'GET',
       query: { group_id: groupId, cursor: params?.cursor, limit: params?.limit },
-    }).then((r) => r.body)
+    })
+    return r.body
   },
 
-  createPost(payload: CreatePostRequest) {
-    return http<Envelope<Post>>('/post', {
+  async createPost(payload: CreatePostRequest) {
+    const r = await http<Envelope<Post>>('/forum/post', {
       method: 'POST',
       body: payload,
-    }).then((r) => r.body)
+    })
+    return r.body
   },
 
-  updatePost(postId: string, payload: UpdatePostRequest) {
-    return http<Envelope<Post>>(`/post/${postId}`, {
+  async updatePost(postId: string, payload: UpdatePostRequest) {
+    const r = await http<Envelope<Post>>(`/forum/post/${postId}`, {
       method: 'PUT',
       body: payload,
-    }).then((r) => r.body)
+    })
+    return r.body
   },
 
   deletePost(postId: string) {
-    return http<void>(`/posts/${postId}`, { method: 'DELETE' })
+    return http<void>(`/forum/posts/${postId}`, { method: 'DELETE' })
   },
 
   // ---- Comments ----
-  listComments(postId: string, groupId: string, params?: { cursor?: string; limit?: number }) {
-    return http<Envelope<ListCommentsResponse>>(`/posts/${postId}/comments`, {
+  async listComments(
+    postId: string,
+    groupId: string,
+    params?: { cursor?: string; limit?: number },
+  ) {
+    const r = await http<Envelope<ListCommentsResponse>>(`/forum/posts/${postId}/comments`, {
       method: 'GET',
       query: { group_id: groupId, cursor: params?.cursor, limit: params?.limit },
-    }).then((r) => r.body)
+    })
+    return r.body
   },
 
-  createComment(postId: string, payload: CreateCommentRequest) {
-    return http<Envelope<Comment>>(`/posts/${postId}/comments`, {
+  async createComment(postId: string, payload: CreateCommentRequest) {
+    const r = await http<Envelope<Comment>>(`/forum/posts/${postId}/comments`, {
       method: 'POST',
       body: payload,
-    }).then((r) => r.body)
+    })
+    return r.body
   },
 
-  updateComment(postId: string, commentSk: string, payload: UpdateCommentRequest) {
-    return http<Envelope<Comment>>(`/posts/${postId}/comments/${encodeURIComponent(commentSk)}`, {
-      method: 'PUT',
-      body: payload,
-    }).then((r) => r.body)
+  async updateComment(postId: string, commentSk: string, payload: UpdateCommentRequest) {
+    const r = await http<Envelope<Comment>>(
+      `/forum/posts/${postId}/comments/${encodeURIComponent(commentSk)}`,
+      {
+        method: 'PUT',
+        body: payload,
+      },
+    )
+    return r.body
   },
 
-  deleteComment(postId: string, commentSk: string) {
-    return http<void>(`/posts/${postId}/comments/${encodeURIComponent(commentSk)}`, {
+  async deleteComment(postId: string, commentSk: string) {
+    return http<void>(`/forum/posts/${postId}/comments/${encodeURIComponent(commentSk)}`, {
       method: 'DELETE',
     })
   },
 
   // ---- Uploads ----
-  getPresignedUpload(payload: PresignUploadRequest) {
-    return http<Envelope<PresignedUpload>>('/post/upload', {
+  async getPresignedUpload(payload: PresignUploadRequest) {
+    const r = await http<Envelope<PresignedUpload>>('/forum/post/upload', {
       method: 'POST',
       body: payload,
-    }).then((r) => r.body)
+    })
+    return r.body
   },
 }
 
