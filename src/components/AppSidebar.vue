@@ -51,7 +51,11 @@ const navMain = computed(() => [
     title: 'Forum',
     url: '#',
     icon: BookOpen,
-    items: [{ title: 'Introduction', url: '#' }],
+    items: groupStore.selfGroups.map((g) => ({
+      title: g.name,
+      url: `/dashboard/forum/${g.group_id}`,
+      groupId: g.group_id,
+    })),
   },
 ])
 </script>

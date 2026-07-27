@@ -10,10 +10,13 @@ import Groups from '@/views/dashboard/groups.vue'
 import GroupDetails from '@/views/dashboard/group_details.vue'
 import Profile from '@/views/dashboard/profile.vue'
 import Chat from '@/views/dashboard/chat.vue'
+import ForumGroup from '@/views/dashboard/ForumGroupPage.vue'
+import ForumPost from '@/views/dashboard/ForumPostPage.vue';
 import { useAuthStore } from '@/stores/auth.ts'
 import { useRegistrationFlowStore } from '@/stores/registrationFlow.ts'
 import { useGroupStore } from '@/stores/group.ts'
 import { useProfileStore } from '@/stores/profile.ts'
+import { useForumStore } from '@/stores/forum.ts';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -91,10 +94,42 @@ const router = createRouter({
           name: 'dashboard-chat',
           component: Chat,
           meta: {
+            presence: true, // <- explicit opt-in, nothing else reads this
             breads: () =>
               useGroupStore().selfGroups.find(
                 (g) => g.group_id === router.currentRoute.value.params.groupId,
               )?.name ?? 'Chat',
+          },
+        },
+        {
+          path: 'forum/:groupId',
+          name: 'dashboard-forum',
+          component: ForumGroup,
+          meta: {
+            breads: () =>
+              useGroupStore().selfGroups.find(
+                (g) => g.group_id === router.currentRoute.value.params.groupId,
+              )?.name ?? 'Forum',
+          },
+        },
+        {
+          path: 'forum/:groupId/posts/:postId',
+          name: 'dashboard-forum-post',
+          component: ForumPost,
+          meta: {
+            // returns an array, same trick as dashboard-group-member-profile:
+            // crumb 1 links back to the group's forum list, crumb 2 is the post itself
+            breads: (route: { params: { groupId: any } }) => [
+              {
+                title:
+                  useGroupStore().selfGroups.find((g) => g.group_id === route.params.groupId)
+                    ?.name ?? 'Forum',
+                to: { name: 'dashboard-forum', params: { groupId: route.params.groupId } },
+              },
+              {
+                title: useForumStore().currentPost?.title ?? 'Post',
+              },
+            ],
           },
         },
       ],

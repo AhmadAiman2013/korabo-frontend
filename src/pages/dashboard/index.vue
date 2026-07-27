@@ -36,7 +36,7 @@ const breadcrumbs = computed(() => {
       return items.map((item) => ({
         title: item.title,
         path: item.to ? router.resolve(item.to).path : r.path,
-        groupId: r.name === 'dashboard-chat' ? (route.params.groupId as string) : undefined,
+        groupId: r.meta.presence ? (route.params.groupId as string) : undefined,
       }))
     })
 })
