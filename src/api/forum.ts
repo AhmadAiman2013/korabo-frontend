@@ -133,19 +133,23 @@ export const forumApi = {
   },
 
   async updateComment(postId: string, commentSk: string, payload: UpdateCommentRequest) {
+    const { createdAt, commentId } = parseCommentSk(commentSk)
     const r = await http<Envelope<Comment>>(
       `/forum/posts/${postId}/comments/${encodeURIComponent(commentSk)}`,
       {
         method: 'PUT',
         body: payload,
+        query: { comment_id: commentId, created_at: createdAt },
       },
     )
     return r.body
   },
 
   async deleteComment(postId: string, commentSk: string) {
+    const { createdAt, commentId } = parseCommentSk(commentSk)
     return http<void>(`/forum/posts/${postId}/comments/${encodeURIComponent(commentSk)}`, {
       method: 'DELETE',
+      query: { comment_id: commentId, created_at: createdAt },
     })
   },
 
@@ -177,7 +181,7 @@ export async function uploadAttachment(
   })
 
   const contentDisposition = file.type.startsWith('image/')
-  ? undefined
+    ? undefined
     : `attachment; filename="${presigned.file_name}"`
 
   await putToStorage(presigned.upload_url, file, contentDisposition, onProgress)
@@ -190,7 +194,12 @@ export async function uploadAttachment(
 }
 
 // XHR (not fetch) so we can report real upload progress for a progress bar.
-function putToStorage(uploadUrl: string, file: File, contentDisposition: string | undefined, onProgress?: (pct: number) => void): Promise<void> {
+function putToStorage(
+  uploadUrl: string,
+  file: File,
+  contentDisposition: string | undefined,
+  onProgress?: (pct: number) => void,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', uploadUrl, true)
@@ -208,4 +217,12 @@ function putToStorage(uploadUrl: string, file: File, contentDisposition: string 
     xhr.onerror = () => reject(new Error('Upload failed'))
     xhr.send(file)
   })
+}
+
+function parseCommentSk(sk: string): { createdAt: string; commentId: string } {
+  const parts = sk.split('#')
+  if (parts.length !== 3 || parts[0] !== 'COMMENT' || !parts[1] || !parts[2]) {
+    throw new Error(`Invalid comment sk format: ${sk}`)
+  }
+  return { createdAt: parts[1], commentId: parts[2] }
 }
