@@ -74,6 +74,7 @@ export interface PresignedUpload {
   upload_url: string
   key: string
   expires_in_secs: number
+  file_name: string
 }
 
 interface Envelope<T> {
@@ -177,7 +178,7 @@ export async function uploadAttachment(
 
   const contentDisposition = file.type.startsWith('image/')
   ? undefined
-    : `attachment; filename="${sanitizeForHeader(file.name)}"`
+    : `attachment; filename="${presigned.file_name}"`
 
   await putToStorage(presigned.upload_url, file, contentDisposition, onProgress)
 
@@ -207,9 +208,4 @@ function putToStorage(uploadUrl: string, file: File, contentDisposition: string 
     xhr.onerror = () => reject(new Error('Upload failed'))
     xhr.send(file)
   })
-}
-
-// header values can't contain raw quotes/newlines; keep it simple
-function sanitizeForHeader(name: string) {
-  return name.replace(/["\r\n]/g, '_')
 }
