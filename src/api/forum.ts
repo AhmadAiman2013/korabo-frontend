@@ -135,7 +135,7 @@ export const forumApi = {
   async updateComment(postId: string, commentSk: string, payload: UpdateCommentRequest) {
     const { createdAt, commentId } = parseCommentSk(commentSk)
     const r = await http<Envelope<Comment>>(
-      `/forum/posts/${postId}/comments}`,
+      `/forum/posts/${postId}/comments`,
       {
         method: 'PUT',
         body: payload,
@@ -147,7 +147,7 @@ export const forumApi = {
 
   async deleteComment(postId: string, commentSk: string) {
     const { createdAt, commentId } = parseCommentSk(commentSk)
-    return http<void>(`/forum/posts/${postId}/comments}`, {
+    return http<void>(`/forum/posts/${postId}/comments`, {
       method: 'DELETE',
       query: { comment_id: commentId, created_at: createdAt },
     })
