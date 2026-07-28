@@ -3,6 +3,7 @@ import type { Attachment, Comment as CommentModel } from '@/api/forum.ts'
 import { computed, ref } from 'vue'
 import { useAttachmentUpload } from '@/composables/useAttachmentUpload.ts'
 import { Button } from '@/components/ui/button'
+import { Textarea as Txt } from '@/components/ui/textarea'
 import AttachmentPicker from '@/components/AttachmentPicker.vue'
 import { Loader2 } from '@lucide/vue'
 
@@ -54,7 +55,7 @@ function handleCancel() {
 
 <template>
   <form class="space-y-2" @submit.prevent="handleSubmit">
-    <Textarea
+    <Txt
       v-model="body"
       :autofocus="autofocus"
       placeholder="Write a comment..."

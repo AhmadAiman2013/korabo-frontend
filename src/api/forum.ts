@@ -175,7 +175,11 @@ export async function uploadAttachment(
     content_length: file.size,
   })
 
-  await putToStorage(presigned.upload_url, file, onProgress)
+  const contentDisposition = file.type.startsWith('image/')
+  ? undefined
+    : `attachment; filename="${sanitizeForHeader(file.name)}"`
+
+  await putToStorage(presigned.upload_url, file, contentDisposition, onProgress)
 
   return {
     key: presigned.key,
@@ -185,16 +189,27 @@ export async function uploadAttachment(
 }
 
 // XHR (not fetch) so we can report real upload progress for a progress bar.
-function putToStorage(uploadUrl: string, file: File, onProgress?: (pct: number) => void): Promise<void> {
+function putToStorage(uploadUrl: string, file: File, contentDisposition: string | undefined, onProgress?: (pct: number) => void): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', uploadUrl, true)
     xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream')
+    if (contentDisposition) {
+      xhr.setRequestHeader('Content-Disposition', contentDisposition)
+    }
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100))
     }
-    xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(`Upload failed (${xhr.status})`)))
+    xhr.onload = () =>
+      xhr.status >= 200 && xhr.status < 300
+        ? resolve()
+        : reject(new Error(`Upload failed (${xhr.status})`))
     xhr.onerror = () => reject(new Error('Upload failed'))
     xhr.send(file)
   })
+}
+
+// header values can't contain raw quotes/newlines; keep it simple
+function sanitizeForHeader(name: string) {
+  return name.replace(/["\r\n]/g, '_')
 }

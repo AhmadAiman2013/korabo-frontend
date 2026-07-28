@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Attachment as AttachmentModel } from '@/api/forum.ts'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import {
   Attachment,
   AttachmentContent,
@@ -10,7 +10,8 @@ import {
   AttachmentTitle,
   AttachmentTrigger,
 } from '@/components/ui/attachment'
-import  {FileTextIcon } from '@lucide/vue'
+import { FileText } from '@lucide/vue'
+import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog'
 
 const props = defineProps<{
   attachments: AttachmentModel[]
@@ -19,9 +20,12 @@ const props = defineProps<{
 const images = computed(() => props.attachments.filter((a) => a.content_type.startsWith('image/')))
 const files = computed(() => props.attachments.filter((a) => !a.content_type.startsWith('image/')))
 
+const lightboxImage = ref<AttachmentModel | null>(null)
+
 function fileName(a: AttachmentModel) {
-  const parts = a.key.split('/')
-  return parts[parts.length - 1]
+  const raw = a.key.split('/').pop() ?? ''
+  // strip the leading "{uuid}-" prefix your backend adds
+  return raw.replace(/^[0-9a-f-]{36}-/, '')
 }
 
 function formatBytes(bytes: number) {
@@ -43,11 +47,10 @@ function formatBytes(bytes: number) {
           <AttachmentDescription>{{ formatBytes(img.size_bytes) }}</AttachmentDescription>
         </AttachmentContent>
         <AttachmentTrigger as-child>
-          <a
-            :href="img.url ?? undefined"
-            target="_blank"
-            rel="noreferrer"
-            :aria-label="`Open ${fileName(img)}`"
+          <button
+            type="button"
+            :aria-label="`View ${fileName(img)}`"
+            @click="lightboxImage = img"
           />
         </AttachmentTrigger>
       </Attachment>
@@ -56,23 +59,30 @@ function formatBytes(bytes: number) {
     <template v-for="f in files" :key="f.key">
       <Attachment class="w-64">
         <AttachmentMedia>
-          <FileTextIcon />
+          <FileText />
         </AttachmentMedia>
         <AttachmentContent>
           <AttachmentTitle>{{ fileName(f) }}</AttachmentTitle>
           <AttachmentDescription>{{ formatBytes(f.size_bytes) }}</AttachmentDescription>
         </AttachmentContent>
         <AttachmentTrigger as-child>
-          <a
-            :href="f.url ?? undefined"
-            target="_blank"
-            rel="noreferrer"
-            :aria-label="`Download ${fileName(f)}`"
-          />
+          <a :href="f.url ?? undefined" rel="noreferrer" :aria-label="`Download ${fileName(f)}`" />
         </AttachmentTrigger>
       </Attachment>
     </template>
   </AttachmentGroup>
+
+  <Dialog :open="!!lightboxImage" @update:open="(v) => !v && (lightboxImage = null)">
+    <DialogTrigger class="hidden"/>
+    <DialogContent class="max-w-3xl p-0">
+      <img
+        v-if="lightboxImage"
+        :src="lightboxImage.url ?? undefined"
+        :alt="fileName(lightboxImage)"
+        class="w-full h-auto rounded-md"
+      />
+    </DialogContent>
+  </Dialog>
 </template>
 
 <style scoped></style>

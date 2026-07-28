@@ -101,7 +101,7 @@ async function handleDelete() {
   deleting.value = true
   try {
     await forumApi.deletePost(post.value.post_id)
-    router.push({ name: 'forum-group', params: { groupId } })
+    router.push({ name: 'dashboard-forum', params: { groupId } })
   } catch (e) {
     errorMessage.value = 'Could not delete this post.'
     deleting.value = false
@@ -120,12 +120,12 @@ onUnmounted(() => forumStore.setCurrentPost(null))
 </script>
 
 <template>
-  <div class="mx-auto max-w-2xl space-y-4 p-4">
+  <div class="mx-auto max-w-2xl w-full space-y-4 p-4">
     <Button
       variant="ghost"
       size="sm"
       class="-ml-2"
-      @click="router.push({ name: 'forum-group', params: { groupId } })"
+      @click="router.push({ name: 'dashboard-forum', params: { groupId } })"
     >
       <ArrowLeft class="mr-1.5 h-4 w-4" /> Back to forum
     </Button>

@@ -6,7 +6,13 @@ import { Button } from '@/components/ui/button'
 import { Plus, Loader2 } from '@lucide/vue'
 import { Skeleton } from '@/components/ui/skeleton'
 import PostCard from '@/components/PostCard.vue'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
 import PostComposer from '@/components/PostComposer.vue'
 
 const route = useRoute()
@@ -64,14 +70,14 @@ async function handleCreate(payload: { title: string; body: string; attachments:
 }
 
 function openPost(post: Post) {
-  router.push({ name: 'forum-post', params: { groupId, postId: post.post_id } })
+  router.push({ name: 'dashboard-forum-post', params: { groupId, postId: post.post_id } })
 }
 
 onMounted(loadFirstPage)
 </script>
 
 <template>
-  <div class="mx-auto max-w-2xl space-y-4 p-4">
+  <div class="mx-auto max-w-2xl w-full space-y-4 p-4">
     <div class="flex items-center justify-between">
       <h1 class="text-xl font-semibold">Forum</h1>
       <Button size="sm" @click="showComposer = true">
@@ -103,7 +109,7 @@ onMounted(loadFirstPage)
     </div>
 
     <Dialog v-model:open="showComposer">
-      <DialogTrigger class="hidden"/>
+      <DialogTrigger class="hidden" />
 
       <DialogContent class="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
