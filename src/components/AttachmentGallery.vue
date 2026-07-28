@@ -36,44 +36,52 @@ function formatBytes(bytes: number) {
 </script>
 
 <template>
-  <AttachmentGroup v-if="attachments.length" class="mt-3">
-    <template v-for="img in images" :key="img.key">
-      <Attachment orientation="vertical" class="w-40">
-        <AttachmentMedia variant="image">
-          <img :src="img.url ?? undefined" :alt="fileName(img)" />
-        </AttachmentMedia>
-        <AttachmentContent>
-          <AttachmentTitle>{{ fileName(img) }}</AttachmentTitle>
-          <AttachmentDescription>{{ formatBytes(img.size_bytes) }}</AttachmentDescription>
-        </AttachmentContent>
-        <AttachmentTrigger as-child>
-          <button
-            type="button"
-            :aria-label="`View ${fileName(img)}`"
-            @click="lightboxImage = img"
-          />
-        </AttachmentTrigger>
-      </Attachment>
-    </template>
+  <div v-if="attachments.length" class="mt-3 flex flex-col gap-2">
+    <AttachmentGroup v-if="images.length" class="flex-wrap items-start">
+      <template v-for="img in images" :key="img.key">
+        <Attachment orientation="vertical" class="w-40">
+          <AttachmentMedia variant="image">
+            <img :src="img.url ?? undefined" :alt="fileName(img)" />
+          </AttachmentMedia>
+          <AttachmentContent>
+            <AttachmentTitle>{{ fileName(img) }}</AttachmentTitle>
+            <AttachmentDescription>{{ formatBytes(img.size_bytes) }}</AttachmentDescription>
+          </AttachmentContent>
+          <AttachmentTrigger as-child>
+            <button
+              type="button"
+              :aria-label="`View ${fileName(img)}`"
+              @click="lightboxImage = img"
+            />
+          </AttachmentTrigger>
+        </Attachment>
+      </template>
+    </AttachmentGroup>
 
-    <template v-for="f in files" :key="f.key">
-      <Attachment class="w-64">
-        <AttachmentMedia>
-          <FileText />
-        </AttachmentMedia>
-        <AttachmentContent>
-          <AttachmentTitle>{{ fileName(f) }}</AttachmentTitle>
-          <AttachmentDescription>{{ formatBytes(f.size_bytes) }}</AttachmentDescription>
-        </AttachmentContent>
-        <AttachmentTrigger as-child>
-          <a :href="f.url ?? undefined" rel="noreferrer" :aria-label="`Download ${fileName(f)}`" />
-        </AttachmentTrigger>
-      </Attachment>
-    </template>
-  </AttachmentGroup>
+    <AttachmentGroup v-if="files.length" class="flex-wrap items-start">
+      <template v-for="f in files" :key="f.key">
+        <Attachment class="w-64">
+          <AttachmentMedia>
+            <FileText />
+          </AttachmentMedia>
+          <AttachmentContent>
+            <AttachmentTitle>{{ fileName(f) }}</AttachmentTitle>
+            <AttachmentDescription>{{ formatBytes(f.size_bytes) }}</AttachmentDescription>
+          </AttachmentContent>
+          <AttachmentTrigger as-child>
+            <a
+              :href="f.url ?? undefined"
+              rel="noreferrer"
+              :aria-label="`Download ${fileName(f)}`"
+            />
+          </AttachmentTrigger>
+        </Attachment>
+      </template>
+    </AttachmentGroup>
+  </div>
 
   <Dialog :open="!!lightboxImage" @update:open="(v) => !v && (lightboxImage = null)">
-    <DialogTrigger class="hidden"/>
+    <DialogTrigger class="hidden" />
     <DialogContent class="max-w-3xl p-0">
       <img
         v-if="lightboxImage"
